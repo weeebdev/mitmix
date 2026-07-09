@@ -4,6 +4,7 @@ A **decentralized mitmproxy** built on the Beszel hub/agent model.
 
 - **Hub** (Go, embeds [PocketBase](https://pocketbase.io/)) — central source of truth for all state: nodes, rules, queries, and captured flows. Serves a dashboard and a WebSocket endpoint agents dial out to.
 - **Agents** (Python, native [mitmproxy](https://mitmproxy.org/) addons) — one per proxy node. Dial the hub, pull their assigned rules, apply them to live traffic, and stream captured flows back to the hub.
+- **MCP server** — the hub also exposes an [MCP](https://modelcontextprotocol.io/) server so LLM agents can query flows, manage rules, inspect nodes, and run saved queries programmatically.
 
 ## Architecture
 
@@ -58,5 +59,24 @@ Scaffold phase. See `PLAN.md` for the full build plan and phased roadmap.
 
 ## Requirements
 
-- Go 1.22+ (hub)
+- Go 1.22+ (hub) — or use the Nix dev shell: `nix develop`
 - Python 3.11+ (agents), `mitmproxy`, `pocketbase` (PyPI)
+- Docker + Compose for containerized deploy: `docker compose up`
+
+## Dev environment (Nix)
+
+A `flake.nix` provides Go 1.22, Python 3.11, mitmproxy, and docker-compose:
+
+```sh
+nix develop        # enter dev shell with go, python, mitmproxy, docker-compose
+go run .           # run hub
+cd agent && pip install -e .
+```
+
+## Deploy (Compose)
+
+`compose.yaml` brings up the hub (PocketBase on :8090) and an agent:
+
+```sh
+AGENT_TOKEN=<node_token> docker compose up
+```

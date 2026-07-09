@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  hub:
+    build:
+      context: .
+      dockerfile: Dockerfile.hub
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      - pb_data:/pb_data
+
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile.agent
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      HUB_URL: ws://host.docker.internal:8090
+      TOKEN: ${AGENT_TOKEN:-}
+    depends_on:
+      - hub
+
+volumes:
+  pb_data:

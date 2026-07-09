@@ -82,6 +82,14 @@ mitm-decentralized/
 5. **Dashboard** — minimal PocketBase admin views + a small custom UI for nodes, rules,
    live flow stream, saved queries.
 
+6. **MCP server** — the hub exposes a Model Context Protocol server so LLM agents can:
+   - list/inspect `nodes` and their live status,
+   - create/update/enable/disable `rules` (and push deltas to agents in real time),
+   - run `queries` over `flows` (search by host/path/method/status, time ranges),
+   - fetch a specific flow's headers/body via `flow_bodies`.
+   Implemented as an MCP endpoint in the hub (e.g. `/api/mcp` over Streamable HTTP, or
+   stdio for local use). Reuses PocketBase record access; no new datastore.
+
 ## 6. Key decisions
 
 - Go hub stays faithful to Beszel (single binary, embedded PocketBase). Python agents use
@@ -89,3 +97,5 @@ mitm-decentralized/
 - Rule matching lives **in the agent** (close to traffic, low latency); hub is source of
   truth + realtime distributor.
 - Flows stored centrally; retention policy needed since this table grows fast.
+- MCP is a thin read/write layer over the same PocketBase collections — single source of
+  truth, no sync divergence.

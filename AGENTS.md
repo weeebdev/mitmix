@@ -12,11 +12,15 @@ apply them to live traffic, and stream captured flows back.
 - **Agent** — Python, native mitmproxy addons. `agent/mitm_agent.py` runs mitmproxy with
   `addons/rule_engine.py` + `addons/flow_capture.py`, and `agent/ws_client.py` keeps the
   hub WebSocket alive.
+- **MCP server** — hub exposes an MCP server (over PocketBase collections) so LLM agents can
+  query flows, manage rules, inspect nodes, and run saved queries. No separate datastore.
 
 ## Toolchain
-- Hub: **Go 1.22+** — NOT currently installed on this machine (no `go` on PATH).
-  Install before building hub: `brew install go` (macOS).
-- Agents: Python 3.11+, `mitmproxy`, `pocketbase` (PyPI).
+- Hub: **Go 1.22+**. On this Nix machine use `nix develop` (flake provides go_1_22) instead
+  of `brew install go`.
+- Agents: Python 3.11+, `mitmproxy`, `pocketbase` (PyPI). Also available via `nix develop`.
+- Deploy: `docker compose up` (compose.yaml + Dockerfile.hub / agent/Dockerfile.agent).
+- MCP: served by the hub; point an MCP client at the hub's MCP endpoint.
 
 ## Conventions
 - Hub in Go, faithful to Beszel (single binary, embedded PocketBase, `/api/mitm/*` routes).
