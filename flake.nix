@@ -21,9 +21,9 @@
         devShells.default = pkgs.mkShell {
           packages = [
             pkgs.go_1_25
-            pkgs.python311
-            pkgs.python311Packages.pip
-            pkgs.python311Packages.virtualenv
+            pkgs.python313
+            pkgs.python313Packages.pip
+            pkgs.python313Packages.virtualenv
             pkgs.docker-compose
             pkgs.mitmproxy
           ];

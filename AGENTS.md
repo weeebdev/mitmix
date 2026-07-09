@@ -33,6 +33,13 @@ apply them to live traffic, and stream captured flows back.
 - Hub: `go run .` (after Go installed) — boots PocketBase on :8090.
 - Agent: `cd agent && pip install -e . && python mitm_agent.py --hub ws://localhost:8090 --token <node_token>`
 
+## Tests
+- Agent (Python): from repo root, `nix develop`, then:
+  `cd agent && python -m venv .venv && . .venv/bin/activate && pip install -e '.[test]' aiohttp && python -m pytest`
+  NOTE: build the venv with the Nix shell's Python (3.13) so native libs
+  (cryptography/mitmproxy) match; a 3.11 venv breaks the cryptography binary.
+- Hub (Go): `go test ./...` (once Go/hub code lands).
+
 ## Status
 Scaffold phase. PLAN.md holds the phased roadmap (hub skeleton → agent skeleton → auth+rule
 sync → flow capture → dashboard).
