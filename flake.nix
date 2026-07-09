@@ -20,7 +20,7 @@
       {
         devShells.default = pkgs.mkShell {
           packages = [
-            pkgs.go_1_22
+            pkgs.go_1_23
             pkgs.python311
             pkgs.python311Packages.pip
             pkgs.python311Packages.virtualenv
