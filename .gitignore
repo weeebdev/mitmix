@@ -1,0 +1,21 @@
+# PocketBase / Go
+/pb_data/
+*.db
+*.db-journal
+/bszel_data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+agent/dist/
+agent/build/
+*.egg-info/
+
+# mitmproxy
+~/.mitmproxy/
+mitmproxy-ca*
+
+# OS
+.DS_Store

@@ -1,0 +1,10 @@
+[project]
+name = "mitm-agent"
+version = "0.1.0"
+description = "mitmproxy agent for mitm-decentralized hub"
+requires-python = ">=3.11"
+dependencies = [
+    "mitmproxy>=10",
+    "pocketbase>=0.14",
+    "websockets>=12",
+]
