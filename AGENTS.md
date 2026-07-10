@@ -16,7 +16,7 @@ apply them to live traffic, and stream captured flows back.
   query flows, manage rules, inspect nodes, and run saved queries. No separate datastore.
 
 ## Toolchain
-- Hub: **Go 1.22+**. On this Nix machine use `nix develop` (flake provides go_1_22) instead
+- Hub: **Go 1.22+**. On this Nix machine use `nix develop` (flake provides go_1_25) instead
   of `brew install go`.
 - Agents: Python 3.11+, `mitmproxy`, `pocketbase` (PyPI). Also available via `nix develop`.
 - Deploy: `docker compose up` (compose.yaml + Dockerfile.hub / agent/Dockerfile.agent).
@@ -30,7 +30,8 @@ apply them to live traffic, and stream captured flows back.
 - DO NOT add comments unless asked. Keep files minimal during scaffold phase.
 
 ## Build / run
-- Hub: `go run .` (after Go installed) — boots PocketBase on :8090.
+- Hub: `nix develop && go run . serve` — boots PocketBase on :8090.
+  Set `HUB_ADMIN_EMAIL` and `HUB_ADMIN_PASSWORD` to auto-create admin (no prompt).
 - Agent: `cd agent && pip install -e . && python mitm_agent.py --hub ws://localhost:8090 --token <node_token>`
 
 ## Tests
@@ -40,6 +41,15 @@ apply them to live traffic, and stream captured flows back.
   (cryptography/mitmproxy) match; a 3.11 venv breaks the cryptography binary.
 - Hub (Go): `go test ./...` (once Go/hub code lands).
 
+## API endpoints
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/mitm/agent-connect` | WebSocket upgrade for agents (X-Token header) |
+| POST | `/api/mitm/flows` | Batch flow ingest (JSON body: `{"flows": [...]}`) |
+| GET | `/api/mitm/flows` | List captured flows |
+| GET | `/api/mitm/nodes` | List agent nodes |
+| GET | `/api/mitm/rules` | List rules |
+
 ## Status
-Scaffold phase. PLAN.md holds the phased roadmap (hub skeleton → agent skeleton → auth+rule
-sync → flow capture → dashboard).
+Phase 1 (hub skeleton) + Phase 2 (agent skeleton) complete. Active development.
+PLAN.md holds the remaining phases (auth+rule sync → flow capture → dashboard → MCP).
