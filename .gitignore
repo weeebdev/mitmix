@@ -17,5 +17,9 @@ agent/build/
 ~/.mitmproxy/
 mitmproxy-ca*
 
+# Svelte dashboard
+internal/hub/site/node_modules/
+internal/hub/site/dist/
+
 # OS
 .DS_Store

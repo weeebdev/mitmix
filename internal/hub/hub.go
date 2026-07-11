@@ -57,6 +57,9 @@ func (h *Hub) registerRoutes(se *core.ServeEvent) {
 
 	apiNoAuth.GET("/agent-connect", h.handleAgentConnect)
 
+	se.Router.GET("/dashboard/{path...}", h.handleDashboard)
+	se.Router.GET("/dashboard", h.handleDashboard)
+
 	api.POST("/flows", h.handleIngestFlows)
 	api.GET("/flows", h.handleListFlows)
 

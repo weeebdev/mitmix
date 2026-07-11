@@ -32,7 +32,16 @@ apply them to live traffic, and stream captured flows back.
 ## Build / run
 - Hub: `nix develop && go run . serve` — boots PocketBase on :8090.
   Set `HUB_ADMIN_EMAIL` and `HUB_ADMIN_PASSWORD` to auto-create admin (no prompt).
+  Default credentials (no env vars): `admin@mitm.local` / `mitmadmin123`.
+- Dashboard: open `http://localhost:8090/dashboard` in a browser.
 - Agent: `cd agent && pip install -e . && python mitm_agent.py --hub ws://localhost:8090 --token <node_token>`
+
+## Dashboard
+Svelte 5 app at `internal/hub/site/`. Rebuild with:
+```sh
+cd internal/hub/site && npm install && npm run build
+```
+Then rebuild the Go binary. The compiled assets are embedded via `//go:embed`.
 
 ## Tests
 - Agent (Python): from repo root, `nix develop`, then:
