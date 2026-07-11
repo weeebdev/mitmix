@@ -6,6 +6,7 @@
   import Rules from './lib/Rules.svelte'
   import Flows from './lib/Flows.svelte'
   import Tokens from './lib/Tokens.svelte'
+  import Queries from './lib/Queries.svelte'
 
   let authed = $state(false)
   let tab = $state('nodes')
@@ -23,6 +24,7 @@
     <button class={tab === 'nodes' ? 'active' : ''} onclick={() => tab = 'nodes'}>Nodes</button>
     <button class={tab === 'rules' ? 'active' : ''} onclick={() => tab = 'rules'}>Rules</button>
     <button class={tab === 'flows' ? 'active' : ''} onclick={() => tab = 'flows'}>Flows</button>
+    <button class={tab === 'queries' ? 'active' : ''} onclick={() => tab = 'queries'}>Queries</button>
     <button class={tab === 'tokens' ? 'active' : ''} onclick={() => tab = 'tokens'}>Tokens</button>
     <span class="spacer"></span>
     <button class="logout" onclick={doLogout}>Logout</button>
@@ -35,6 +37,8 @@
       <Rules />
     {:else if tab === 'flows'}
       <Flows />
+    {:else if tab === 'queries'}
+      <Queries />
     {:else if tab === 'tokens'}
       <Tokens />
     {/if}

@@ -75,6 +75,7 @@ func (h *Hub) handleIngestFlows(e *core.RequestEvent) error {
 			log.Printf("failed to save flow: %v", err)
 			continue
 		}
+		broadcastToDash(map[string]any{"action": "flow_created", "data": rec})
 		if f.ReqBody != "" {
 			h.storeFlowBody(rec.Id, "req", f.ReqBody)
 		}

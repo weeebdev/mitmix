@@ -3,17 +3,11 @@ package hub
 import (
 	"encoding/json"
 	"log"
-	"net/http"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
-
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
 
 func (h *Hub) handleAgentConnect(e *core.RequestEvent) error {
 	token := e.Request.Header.Get("X-Token")

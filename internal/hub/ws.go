@@ -3,6 +3,7 @@ package hub
 import (
 	"encoding/json"
 	"log"
+	"net/http"
 	"sync"
 	"time"
 
@@ -16,6 +17,10 @@ const (
 	pongWait       = 90 * time.Second
 	pingInterval   = 30 * time.Second
 )
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return true },
+}
 
 type AgentConn struct {
 	Conn    *websocket.Conn
@@ -56,6 +61,12 @@ func (m *WSManager) Register(token string, ac *AgentConn) {
 	}
 	m.conn[token] = ac
 	log.Printf("agent %s connected (%d total)", token[:8]+"...", len(m.conn))
+	if m.hub != nil {
+		records, err := m.hub.FindRecordsByFilter("nodes", "token = {:token}", "", 1, 0, dbx.Params{"token": token})
+		if err == nil && len(records) > 0 {
+			broadcastToDash(map[string]any{"action": "node_up", "data": records[0]})
+		}
+	}
 }
 
 func (m *WSManager) Unregister(token string) {
@@ -71,6 +82,7 @@ func (m *WSManager) Unregister(token string) {
 	if err == nil && len(records) > 0 {
 		records[0].Set("status", "down")
 		m.hub.Save(records[0])
+		broadcastToDash(map[string]any{"action": "node_down", "data": records[0]})
 	}
 }
 
@@ -165,5 +177,44 @@ func (h *Hub) listenAgentWS(ac *AgentConn) {
 		case "pong":
 		case "heartbeat":
 		}
+	}
+}
+
+var (
+	dashClients   = map[*websocket.Conn]bool{}
+	dashClientsMu sync.RWMutex
+)
+
+func (h *Hub) handleDashboardWS(e *core.RequestEvent) error {
+	conn, err := upgrader.Upgrade(e.Response, e.Request, nil)
+	if err != nil {
+		return nil
+	}
+
+	dashClientsMu.Lock()
+	dashClients[conn] = true
+	dashClientsMu.Unlock()
+
+	defer func() {
+		dashClientsMu.Lock()
+		delete(dashClients, conn)
+		dashClientsMu.Unlock()
+		conn.Close()
+	}()
+
+	for {
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+	}
+	return nil
+}
+
+func broadcastToDash(msg any) {
+	dashClientsMu.RLock()
+	defer dashClientsMu.RUnlock()
+	for conn := range dashClients {
+		conn.WriteJSON(msg)
 	}
 }

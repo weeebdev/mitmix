@@ -1,13 +1,15 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { listFlows, fmtTime } from '../api'
+  import { listFlows, fmtTime, connectLive } from '../api'
   import type { Flow } from '../api'
   import FlowDetail from './FlowDetail.svelte'
 
   let flows = $state<Flow[]>([])
   let selected = $state<Flow | null>(null)
   let error = $state('')
+  let newFlowIds = $state<Set<string>>(new Set())
   let interval: number
+  let cleanup: (() => void) | null = null
 
   let method = $state('')
   let host = $state('')
@@ -42,8 +44,24 @@
     load()
   }
 
-  onMount(() => { load(); interval = setInterval(load, 5000) })
-  onDestroy(() => clearInterval(interval))
+  onMount(() => {
+    load()
+    interval = setInterval(load, 5000)
+    cleanup = connectLive((msg) => {
+      if (msg.action === 'flow_created') {
+        const f = msg.data
+        flows = [f, ...flows].slice(0, 200)
+        newFlowIds = new Set([f.id, ...newFlowIds])
+        setTimeout(() => {
+          newFlowIds = new Set([...newFlowIds].filter(id => id !== f.id))
+        }, 2000)
+      }
+    })
+  })
+  onDestroy(() => {
+    clearInterval(interval)
+    if (cleanup) cleanup()
+  })
 </script>
 
 <div class="card"><h3>Captured Flows</h3><div class="val">{flows.length}</div></div>
@@ -66,7 +84,7 @@
       <tbody>
         {#if flows.length}
           {#each flows as f}
-            <tr class:selected={selected?.id === f.id} onclick={() => selected = f}>
+            <tr class:selected={selected?.id === f.id} class:newflow={newFlowIds.has(f.id)} onclick={() => selected = f}>
               <td>{fmtTime(f.captured_at)}</td>
               <td>{f.method}</td><td>{f.host}</td><td>{f.path}</td>
               <td>{f.status_code}</td><td>{f.duration_ms}ms</td>
@@ -99,6 +117,8 @@
   tr { cursor: pointer; }
   tr:hover { background: #161b22; }
   tr.selected { background: #1c2128; }
+  tr.newflow { animation: flash 2s ease-out; }
+  @keyframes flash { 0% { background: #1c3d2e; } 100% { background: transparent; } }
   .empty { color: #8b949e; text-align: center; padding: 24px; }
   .filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
   .filter-bar select, .filter-bar input { padding: 4px 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px; }

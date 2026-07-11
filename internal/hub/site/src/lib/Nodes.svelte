@@ -1,17 +1,28 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
-  import { listNodes } from '../api'
+  import { onMount, onDestroy } from 'svelte'
+  import { listNodes, connectLive } from '../api'
   import type { Node } from '../api'
   import NodeDetail from './NodeDetail.svelte'
 
   let nodes = $state<Node[]>([])
   let error = $state('')
   let selectedNode = $state<Node | null>(null)
+  let cleanup: (() => void) | null = null
 
-  onMount(async () => {
+  async function load() {
     try { nodes = await listNodes() }
     catch (e: any) { error = e.message }
+  }
+
+  onMount(() => {
+    load()
+    cleanup = connectLive((msg) => {
+      if (msg.action === 'node_up' || msg.action === 'node_down') {
+        setTimeout(load, 500)
+      }
+    })
   })
+  onDestroy(() => { if (cleanup) cleanup() })
 </script>
 
 <div class="card"><h3>Connected Nodes</h3><div class="val">{nodes.length}</div></div>

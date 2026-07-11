@@ -127,4 +127,31 @@ export function listTokens() { return api<Token[]>('GET', '/tokens') }
 export function generateToken(label: string) { return api<Token>('POST', '/tokens', { label }) }
 export function deleteToken(id: string) { return api<{deleted: string}>('DELETE', '/tokens/' + id) }
 
-export type { Flow, FlowDetail, Rule, Node, Token }
+export function listQueries() { return api<Query[]>('GET', '/queries') }
+export function createQuery(name: string, filter: string) { return api<Query>('POST', '/queries', { name, filter }) }
+export function deleteQuery(id: string) { return api<{deleted: string}>('DELETE', '/queries/' + id) }
+export function runQuery(id: string) { return api<Flow[]>('GET', '/queries/' + id + '/run') }
+
+interface Query {
+  id: string
+  name: string
+  filter: string
+}
+
+export function connectLive(cb: (msg: any) => void): () => void {
+  const token = getToken()
+  if (!token) return () => {}
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const ws = new WebSocket(proto + '//' + location.host + '/ws/dash')
+  const sendAuth = () => {
+    if (ws.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({ action: 'auth', token }))
+  }
+  ws.onopen = sendAuth
+  ws.onmessage = (e) => {
+    try { cb(JSON.parse(e.data)) } catch {}
+  }
+  return () => ws.close()
+}
+
+export type { Flow, FlowDetail, Rule, Node, Token, Query }
