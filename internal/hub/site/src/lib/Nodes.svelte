@@ -2,9 +2,11 @@
   import { onMount } from 'svelte'
   import { listNodes } from '../api'
   import type { Node } from '../api'
+  import NodeDetail from './NodeDetail.svelte'
 
   let nodes = $state<Node[]>([])
   let error = $state('')
+  let selectedNode = $state<Node | null>(null)
 
   onMount(async () => {
     try { nodes = await listNodes() }
@@ -19,7 +21,7 @@
   <tbody>
     {#if nodes.length}
       {#each nodes as n}
-        <tr>
+        <tr class="row" onclick={() => selectedNode = n} role="button" tabindex="0">
           <td>{n.name || n.id}</td>
           <td>{n.token?.slice(0, 8)}…</td>
           <td>{n.fingerprint || '-'}</td>
@@ -33,10 +35,16 @@
   </tbody>
 </table>
 
+{#if selectedNode}
+  <NodeDetail node={selectedNode} onclose={() => selectedNode = null} />
+{/if}
+
 <style>
   .card { background: #161b22; padding: 16px; border-radius: 6px; border: 1px solid #30363d; margin-bottom: 16px; display: inline-block; }
   .card h3 { font-size: 12px; color: #8b949e; text-transform: uppercase; }
   .card .val { font-size: 28px; font-weight: 700; }
+  .row { cursor: pointer; }
+  .row:hover { background: #161b22; }
   table { width: 100%; border-collapse: collapse; }
   th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #21262d; font-size: 13px; }
   th { color: #8b949e; font-weight: 600; }

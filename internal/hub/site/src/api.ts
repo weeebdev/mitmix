@@ -9,6 +9,7 @@ function clearToken() { localStorage.removeItem('pb_token') }
 
 interface Flow {
   id: string
+  node: string
   method: string
   host: string
   path: string
@@ -67,5 +68,36 @@ export function isAuthed(): boolean { return !!getToken() }
 export function listNodes() { return api<Node[]>('GET', '/nodes') }
 export function listRules() { return api<Rule[]>('GET', '/rules') }
 export function listFlows() { return api<Flow[]>('GET', '/flows') }
+export function listFlowsByNode(node: string) { return api<Flow[]>('GET', '/flows?node=' + encodeURIComponent(node)) }
+export function getFlowDetail(id: string) { return api<FlowDetail>('GET', '/flows/' + id) }
 export function createRule(r: Partial<Rule>) { return api<Rule>('POST', '/rules', r) }
-export type { Flow, Rule, Node }
+
+interface FlowDetail {
+  id: string
+  node: string
+  captured_at: string
+  method: string
+  host: string
+  path: string
+  status_code: number
+  req_size: number
+  resp_size: number
+  duration_ms: number
+  tags: string[]
+  req_headers: Record<string, string[]>
+  resp_headers: Record<string, string[]>
+  req_body: string
+  resp_body: string
+}
+
+interface Token {
+  id: string
+  token: string
+  label: string
+}
+
+export function listTokens() { return api<Token[]>('GET', '/tokens') }
+export function generateToken(label: string) { return api<Token>('POST', '/tokens', { label }) }
+export function deleteToken(id: string) { return api<{deleted: string}>('DELETE', '/tokens/' + id) }
+
+export type { Flow, FlowDetail, Rule, Node, Token }

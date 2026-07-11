@@ -67,7 +67,11 @@ func (h *Hub) registerRoutes(se *core.ServeEvent) {
 	se.Router.GET("/dashboard", h.handleDashboard)
 
 	api.GET("/flows", h.handleListFlows)
+	api.GET("/flows/{id}", h.handleGetFlow)
 	api.GET("/rules", h.handleListRules)
 	api.POST("/rules", h.handleCreateRule)
 	api.GET("/nodes", h.handleListNodes)
+	api.GET("/tokens", h.handleListTokens)
+	api.POST("/tokens", h.handleCreateToken)
+	api.DELETE("/tokens/{id}", h.handleDeleteToken)
 }

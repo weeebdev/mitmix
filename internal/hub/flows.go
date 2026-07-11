@@ -66,8 +66,55 @@ func (h *Hub) handleIngestFlows(e *core.RequestEvent) error {
 	return e.JSON(200, map[string]any{"ingested": len(req.Flows)})
 }
 
+func (h *Hub) handleGetFlow(e *core.RequestEvent) error {
+	id := e.Request.PathValue("id")
+
+	rec, err := h.FindRecordById("flows", id)
+	if err != nil {
+		return e.NotFoundError("flow not found", nil)
+	}
+
+	bodies, _ := h.FindRecordsByFilter("flow_bodies", "flow = {:flow}", "", 0, 0, dbx.Params{"flow": id})
+
+	var reqBody, respBody string
+	for _, b := range bodies {
+		dir := b.GetString("direction")
+		if dir == "req" {
+			reqBody = b.GetString("body")
+		} else if dir == "resp" {
+			respBody = b.GetString("body")
+		}
+	}
+
+	result := map[string]any{
+		"id":           rec.Get("id"),
+		"node":         rec.Get("node"),
+		"captured_at":  rec.Get("captured_at"),
+		"method":       rec.Get("method"),
+		"host":         rec.Get("host"),
+		"path":         rec.Get("path"),
+		"status_code":  rec.Get("status_code"),
+		"req_headers":  rec.Get("req_headers"),
+		"resp_headers": rec.Get("resp_headers"),
+		"req_size":     rec.Get("req_size"),
+		"resp_size":    rec.Get("resp_size"),
+		"duration_ms":  rec.Get("duration_ms"),
+		"tags":         rec.Get("tags"),
+		"req_body":     reqBody,
+		"resp_body":    respBody,
+	}
+
+	return e.JSON(200, result)
+}
+
 func (h *Hub) handleListFlows(e *core.RequestEvent) error {
-	records, err := h.FindRecordsByFilter("flows", "1=1", "", 100, 0)
+	filter := "1=1"
+	params := dbx.Params{}
+	if node := e.Request.URL.Query().Get("node"); node != "" {
+		filter = "node = {:node}"
+		params["node"] = node
+	}
+	records, err := h.FindRecordsByFilter("flows", filter, "", 100, 0, params)
 	if err != nil {
 		log.Printf("flows query error: %v", err)
 		return e.InternalServerError("query failed", err)
