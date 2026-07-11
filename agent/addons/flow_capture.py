@@ -28,7 +28,7 @@ class FlowCapture:
     async def _post_batch(self, batch):
         await self._ensure_session()
         try:
-            async with self._session.post(f"{self.hub_url}/api/mitm/flows", json=batch) as resp:
+            async with self._session.post(f"{self.hub_url}/api/mitm/flows", json={"flows": batch}) as resp:
                 if resp.status >= 400:
                     logger.warning("flow ingest failed: %s", resp.status)
                     # requeue to avoid loss
