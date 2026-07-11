@@ -6,27 +6,6 @@ import pytest
 from ws_client import HubWebSocketClient
 
 
-class FakeWS:
-    def __init__(self, incoming):
-        self.incoming = list(incoming)
-        self.sent = []
-        self.closed = False
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *a):
-        self.closed = True
-
-    async def recv(self):
-        if self.incoming:
-            return self.incoming.pop(0)
-        raise RuntimeError("no more messages")
-
-    async def send(self, data):
-        self.sent.append(data)
-
-
 @pytest.mark.asyncio
 async def test_builds_ws_url_from_http():
     c = HubWebSocketClient(hub_url="http://localhost:8090", token="tok", on_rules=lambda r: None, flow_sink=lambda f: None)
@@ -43,13 +22,36 @@ async def test_builds_ws_url_from_https():
 async def test_handle_rules_message_calls_on_rules():
     received = []
     c = HubWebSocketClient(hub_url="http://h:8090", token="t", on_rules=received.extend, flow_sink=lambda f: None)
-    msg = json.dumps({"action": "rules", "data": [{"id": "r1", "action": "record"}]})
-    await c._handle(json.loads(msg))
+    await c._handle(None, {"action": "rules", "data": [{"id": "r1", "action": "record"}]})
     assert received == [{"id": "r1", "action": "record"}]
+
+
+@pytest.mark.asyncio
+async def test_handle_rule_upsert_calls_on_rules():
+    received = []
+    c = HubWebSocketClient(hub_url="http://h:8090", token="t", on_rules=received.extend, flow_sink=lambda f: None)
+    await c._handle(None, {"action": "rule_upsert", "data": {"id": "r2", "action": "drop"}})
+    # upsert sends a list with 1 item
+    assert received == [{"id": "r2", "action": "drop"}]
 
 
 @pytest.mark.asyncio
 async def test_handle_unknown_action_noop():
     c = HubWebSocketClient(hub_url="http://h:8090", token="t", on_rules=lambda r: None, flow_sink=lambda f: None)
-    # should not raise
-    await c._handle({"action": "ping"})
+    result = await c._handle(None, {"action": "ping"})
+    assert result is True
+
+
+@pytest.mark.asyncio
+async def test_handle_auth_challenge_returns_true(monkeypatch):
+    sent = []
+
+    class FakeWS:
+        async def send(self, data):
+            sent.append(json.loads(data))
+
+    c = HubWebSocketClient(hub_url="http://h:8090", token="t", on_rules=lambda r: None, flow_sink=lambda f: None)
+    result = await c._handle(FakeWS(), {"action": "auth_challenge", "data": {"nonce": "test"}})
+    assert result is True
+    assert sent[-1]["action"] == "auth_response"
+    assert "fingerprint" in sent[-1].get("data", {})

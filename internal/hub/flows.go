@@ -73,11 +73,3 @@ func (h *Hub) handleListNodes(e *core.RequestEvent) error {
 	}
 	return e.JSON(200, records)
 }
-
-func (h *Hub) handleListRules(e *core.RequestEvent) error {
-	records, err := h.FindRecordsByFilter("rules", "1=1", "priority", 100, 0)
-	if err != nil {
-		return e.InternalServerError("query failed", nil)
-	}
-	return e.JSON(200, records)
-}

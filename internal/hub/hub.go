@@ -13,10 +13,14 @@ import (
 
 type Hub struct {
 	core.App
+	ws *WSManager
 }
 
 func New(app core.App) *Hub {
-	return &Hub{App: app}
+	return &Hub{
+		App: app,
+		ws:  NewWSManager(nil),
+	}
 }
 
 func (h *Hub) Start() error {
@@ -28,6 +32,10 @@ func (h *Hub) Start() error {
 	migratecmd.MustRegister(pb, pb.RootCmd, migratecmd.Config{
 		Automigrate: osutils.IsProbablyGoRun(),
 	})
+
+	h.ws = NewWSManager(h)
+
+	h.registerRuleHooks()
 
 	pb.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		h.registerMiddlewares(se)
