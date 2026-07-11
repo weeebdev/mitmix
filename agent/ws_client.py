@@ -9,14 +9,21 @@ logger = logging.getLogger("ws_client")
 
 
 class HubWebSocketClient:
-    def __init__(self, hub_url, token, on_rules, flow_sink):
+    def __init__(self, hub_url, token, on_rules, flow_sink, local_store):
         self.hub_url = hub_url
         self.token = token
         self.on_rules = on_rules
         self.flow_sink = flow_sink
+        self.local_store = local_store
         self.ws_url = hub_url.replace("http", "ws").rstrip("/") + "/ws/agent-connect"
 
     async def run(self):
+        if self.local_store:
+            cached_rules = self.local_store.load_rules()
+            if cached_rules:
+                logger.info("loaded %d rules from local cache", len(cached_rules))
+                self.on_rules(cached_rules)
+
         headers = {"X-Token": self.token}
         while True:
             try:
@@ -38,9 +45,15 @@ class HubWebSocketClient:
         if action == "auth_challenge":
             return await self._handle_auth(ws, data)
         elif action == "rules":
-            self.on_rules(data if isinstance(data, list) else data.get("rules", []))
+            rules = data if isinstance(data, list) else data.get("rules", [])
+            if self.local_store:
+                self.local_store.save_rules(rules)
+            self.on_rules(rules)
         elif action == "rule_upsert":
-            self.on_rules([data])
+            rules = [data]
+            if self.local_store:
+                self.local_store.save_rules(rules)
+            self.on_rules(rules)
         elif action == "rule_delete":
             self.on_rules([])
         elif action == "ping":

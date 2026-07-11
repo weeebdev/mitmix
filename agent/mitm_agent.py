@@ -10,6 +10,7 @@ from mitmproxy.tools import dump
 from addons.rule_engine import RuleEngine
 from addons.flow_capture import FlowCapture
 from ws_client import HubWebSocketClient
+from local_store import LocalStore
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mitm_agent")
@@ -17,14 +18,16 @@ logger = logging.getLogger("mitm_agent")
 
 class AgentAddon:
     def __init__(self, hub_url, token):
-        self.rule_engine = RuleEngine([])
+        self.local_store = LocalStore()
+        self.rule_engine = RuleEngine(self.local_store.load_rules())
         rest_url = hub_url.replace("ws://", "http://").replace("wss://", "https://")
-        self.flow_capture = FlowCapture(hub_url=rest_url, token=token)
+        self.flow_capture = FlowCapture(hub_url=rest_url, token=token, local_store=self.local_store)
         self.ws_client = HubWebSocketClient(
             hub_url=hub_url,
             token=token,
             on_rules=self.rule_engine.set_rules,
             flow_sink=self.flow_capture.enqueue,
+            local_store=self.local_store,
         )
         self._ws_thread = None
 
