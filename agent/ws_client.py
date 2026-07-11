@@ -14,7 +14,7 @@ class HubWebSocketClient:
         self.token = token
         self.on_rules = on_rules
         self.flow_sink = flow_sink
-        self.ws_url = hub_url.replace("http", "ws").rstrip("/") + "/api/mitm/agent-connect"
+        self.ws_url = hub_url.replace("http", "ws").rstrip("/") + "/ws/agent-connect"
 
     async def run(self):
         headers = {"X-Token": self.token}

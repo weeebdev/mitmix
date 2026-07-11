@@ -56,7 +56,7 @@ func (h *Hub) broadcastRuleDelta(action string, record *core.Record) {
 }
 
 func (h *Hub) handleListRules(e *core.RequestEvent) error {
-	records, err := h.FindRecordsByFilter("rules", "", "priority", 100, 0)
+	records, err := h.FindRecordsByFilter("rules", "1=1", "priority", 100, 0)
 	if err != nil {
 		log.Printf("rules query error: %v", err)
 		return e.InternalServerError("query failed", err)

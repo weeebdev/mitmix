@@ -7,7 +7,14 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
+)
+
+const (
+	writeWait      = 10 * time.Second
+	pongWait       = 90 * time.Second
+	pingInterval   = 30 * time.Second
 )
 
 type AgentConn struct {
@@ -56,6 +63,15 @@ func (m *WSManager) Unregister(token string) {
 	defer m.mu.Unlock()
 	delete(m.conn, token)
 	log.Printf("agent %s disconnected (%d remaining)", token[:8]+"...", len(m.conn))
+
+	if m.hub == nil {
+		return
+	}
+	records, err := m.hub.FindRecordsByFilter("nodes", "token = {:token}", "", 1, 0, dbx.Params{"token": token})
+	if err == nil && len(records) > 0 {
+		records[0].Set("status", "down")
+		m.hub.Save(records[0])
+	}
 }
 
 func (m *WSManager) Broadcast(msg any) {
@@ -105,11 +121,14 @@ func (h *Hub) listenAgentWS(ac *AgentConn) {
 		ac.Conn.Close()
 	}()
 
-	ac.Conn.SetReadDeadline(time.Now().Add(70 * time.Second))
+	ac.Conn.SetReadDeadline(time.Now().Add(pongWait))
 	ac.Conn.SetPongHandler(func(string) error {
-		ac.Conn.SetReadDeadline(time.Now().Add(70 * time.Second))
+		ac.Conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
+
+	pingTicker := time.NewTicker(pingInterval)
+	defer pingTicker.Stop()
 
 	rules, err := h.FindRecordsByFilter("rules", "enabled = true", "priority", 100, 0)
 	if err == nil {
@@ -122,9 +141,14 @@ func (h *Hub) listenAgentWS(ac *AgentConn) {
 		select {
 		case <-ac.closeCh:
 			return
+		case <-pingTicker.C:
+			ac.mu.Lock()
+			ac.Conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
+			ac.mu.Unlock()
 		default:
 		}
 
+		ac.Conn.SetReadDeadline(time.Now().Add(pongWait))
 		_, msg, err := ac.Conn.ReadMessage()
 		if err != nil {
 			log.Printf("agent %s read error: %v", ac.Token[:8]+"...", err)
@@ -139,9 +163,7 @@ func (h *Hub) listenAgentWS(ac *AgentConn) {
 		action, _ := parsed["action"].(string)
 		switch action {
 		case "pong":
-			ac.Conn.SetReadDeadline(time.Now().Add(70 * time.Second))
 		case "heartbeat":
-			// update last_seen
 		}
 	}
 }

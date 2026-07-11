@@ -2,6 +2,7 @@ package hub
 
 import (
 	"log"
+	"net/http"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
@@ -44,6 +45,9 @@ func (h *Hub) Start() error {
 		return se.Next()
 	})
 
+	// Default args for Docker
+	pb.RootCmd.SetArgs([]string{"serve", "--http=0.0.0.0:8090"})
+
 	return pb.Start()
 }
 
@@ -53,18 +57,17 @@ func (h *Hub) registerMiddlewares(se *core.ServeEvent) {
 func (h *Hub) registerRoutes(se *core.ServeEvent) {
 	api := se.Router.Group("/api/mitm")
 
-	apiNoAuth := se.Router.Group("/api/mitm")
-
-	apiNoAuth.GET("/agent-connect", h.handleAgentConnect)
+	se.Router.GET("/", func(e *core.RequestEvent) error {
+		return e.Redirect(http.StatusFound, "/dashboard")
+	})
+	se.Router.GET("/ws/agent-connect", h.handleAgentConnect)
+	se.Router.POST("/api/mitm/flows", h.handleIngestFlows)
 
 	se.Router.GET("/dashboard/{path...}", h.handleDashboard)
 	se.Router.GET("/dashboard", h.handleDashboard)
 
-	api.POST("/flows", h.handleIngestFlows)
 	api.GET("/flows", h.handleListFlows)
-
 	api.GET("/rules", h.handleListRules)
 	api.POST("/rules", h.handleCreateRule)
-
 	api.GET("/nodes", h.handleListNodes)
 }

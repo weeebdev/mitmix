@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/pocketbase/dbx"
@@ -20,7 +21,7 @@ func (h *Hub) handleAgentConnect(e *core.RequestEvent) error {
 		return e.BadRequestError("missing X-Token header", nil)
 	}
 
-	_, err := h.FindFirstRecordByFilter("node_tokens", "token = {:token}", dbx.Params{"token": token})
+	tokenRec, err := h.FindFirstRecordByFilter("node_tokens", "token = {:token}", dbx.Params{"token": token})
 	if err != nil {
 		return e.UnauthorizedError("invalid token", nil)
 	}
@@ -67,8 +68,44 @@ func (h *Hub) handleAgentConnect(e *core.RequestEvent) error {
 	}
 
 	h.ws.Register(token, ac)
+	h.upsertNode(tokenRec, ac)
 
 	go h.listenAgentWS(ac)
 
 	return nil
+}
+
+func (h *Hub) upsertNode(tokenRec *core.Record, ac *AgentConn) {
+	col, err := h.FindCollectionByNameOrId("nodes")
+	if err != nil {
+		log.Printf("nodes collection not found: %v", err)
+		return
+	}
+
+	records, err := h.FindRecordsByFilter("nodes", "token = {:token}", "", 1, 0, dbx.Params{"token": ac.Token})
+	if err == nil && len(records) > 0 {
+		rec := records[0]
+		rec.Set("status", "up")
+		rec.Set("last_seen", time.Now().UTC().Format(time.RFC3339))
+		rec.Set("fingerprint", ac.Node)
+		if err := h.Save(rec); err != nil {
+			log.Printf("node update error: %v", err)
+		}
+		return
+	}
+
+	rec := core.NewRecord(col)
+	name := tokenRec.GetString("label")
+	if name == "" {
+		name = "agent-" + ac.Token[:8]
+	}
+	rec.Set("name", name)
+	rec.Set("token", ac.Token)
+	rec.Set("fingerprint", ac.Node)
+	rec.Set("status", "up")
+	rec.Set("last_seen", time.Now().UTC().Format(time.RFC3339))
+	rec.Set("version", "mitm-agent-1.0")
+	if err := h.Save(rec); err != nil {
+		log.Printf("node create error: %v", err)
+	}
 }

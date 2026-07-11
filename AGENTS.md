@@ -53,7 +53,7 @@ Then rebuild the Go binary. The compiled assets are embedded via `//go:embed`.
 ## API endpoints
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/mitm/agent-connect` | WebSocket upgrade for agents (X-Token header) |
+| GET | `/ws/agent-connect` | WebSocket upgrade for agents (X-Token header, no PB auth) |
 | POST | `/api/mitm/flows` | Batch flow ingest (JSON body: `{"flows": [...]}`) |
 | GET | `/api/mitm/flows` | List captured flows |
 | POST | `/api/mitm/rules` | Create a new rule (triggers live push to agents) |

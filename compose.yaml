@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   hub:
     build:
@@ -13,13 +11,11 @@ services:
 
   agent:
     build:
-      context: ./agent
-      dockerfile: Dockerfile.agent
+      context: .
+      dockerfile: agent/Dockerfile.agent
     restart: unless-stopped
     network_mode: host
-    environment:
-      HUB_URL: ws://host.docker.internal:8090
-      TOKEN: ${AGENT_TOKEN:-}
+    command: ["--hub", "ws://localhost:8090", "--token", "test-agent-token"]
     depends_on:
       - hub
 

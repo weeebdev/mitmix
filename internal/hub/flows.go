@@ -4,19 +4,20 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
 
 type FlowRecord struct {
-	Node       string `json:"node"`
-	Timestamp  string `json:"timestamp"`
-	Method     string `json:"method"`
-	Host       string `json:"host"`
-	Path       string `json:"path"`
-	StatusCode int    `json:"status_code"`
-	ReqSize    int    `json:"req_size"`
-	RespSize   int    `json:"resp_size"`
-	DurationMs int    `json:"duration_ms"`
+	Node       string   `json:"node"`
+	Timestamp  string   `json:"timestamp"`
+	Method     string   `json:"method"`
+	Host       string   `json:"host"`
+	Path       string   `json:"path"`
+	StatusCode int      `json:"status_code"`
+	ReqSize    int      `json:"req_size"`
+	RespSize   int      `json:"resp_size"`
+	DurationMs int      `json:"duration_ms"`
 	Tags       []string `json:"tags"`
 }
 
@@ -25,6 +26,15 @@ type IngestRequest struct {
 }
 
 func (h *Hub) handleIngestFlows(e *core.RequestEvent) error {
+	token := e.Request.Header.Get("X-Token")
+	if token == "" {
+		return e.UnauthorizedError("missing X-Token", nil)
+	}
+	_, err := h.FindFirstRecordByFilter("node_tokens", "token = {:token}", dbx.Params{"token": token})
+	if err != nil {
+		return e.UnauthorizedError("invalid token", nil)
+	}
+
 	var req IngestRequest
 	if err := e.BindBody(&req); err != nil {
 		return e.BadRequestError("invalid request body", nil)
@@ -57,7 +67,7 @@ func (h *Hub) handleIngestFlows(e *core.RequestEvent) error {
 }
 
 func (h *Hub) handleListFlows(e *core.RequestEvent) error {
-	records, err := h.FindRecordsByFilter("flows", "", "", 100, 0)
+	records, err := h.FindRecordsByFilter("flows", "1=1", "", 100, 0)
 	if err != nil {
 		log.Printf("flows query error: %v", err)
 		return e.InternalServerError("query failed", err)
@@ -66,7 +76,7 @@ func (h *Hub) handleListFlows(e *core.RequestEvent) error {
 }
 
 func (h *Hub) handleListNodes(e *core.RequestEvent) error {
-	records, err := h.FindRecordsByFilter("nodes", "", "", 100, 0)
+	records, err := h.FindRecordsByFilter("nodes", "1=1", "", 100, 0)
 	if err != nil {
 		log.Printf("nodes query error: %v", err)
 		return e.InternalServerError("query failed", err)
