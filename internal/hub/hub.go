@@ -70,8 +70,12 @@ func (h *Hub) registerRoutes(se *core.ServeEvent) {
 	api.GET("/flows/{id}", h.handleGetFlow)
 	api.GET("/rules", h.handleListRules)
 	api.POST("/rules", h.handleCreateRule)
+	api.PUT("/rules/{id}", h.handleUpdateRule)
+	api.DELETE("/rules/{id}", h.handleDeleteRule)
+	api.POST("/rules/reorder", h.handleReorderRules)
 	api.GET("/nodes", h.handleListNodes)
 	api.GET("/tokens", h.handleListTokens)
 	api.POST("/tokens", h.handleCreateToken)
 	api.DELETE("/tokens/{id}", h.handleDeleteToken)
+	se.Router.POST("/mcp", h.handleMCP)
 }

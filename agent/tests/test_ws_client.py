@@ -9,13 +9,13 @@ from ws_client import HubWebSocketClient
 @pytest.mark.asyncio
 async def test_builds_ws_url_from_http():
     c = HubWebSocketClient(hub_url="http://localhost:8090", token="tok", on_rules=lambda r: None, flow_sink=lambda f: None)
-    assert c.ws_url == "ws://localhost:8090/api/mitm/agent-connect"
+    assert c.ws_url == "ws://localhost:8090/ws/agent-connect"
 
 
 @pytest.mark.asyncio
 async def test_builds_ws_url_from_https():
     c = HubWebSocketClient(hub_url="https://hub.example.com", token="tok", on_rules=lambda r: None, flow_sink=lambda f: None)
-    assert c.ws_url == "wss://hub.example.com/api/mitm/agent-connect"
+    assert c.ws_url == "wss://hub.example.com/ws/agent-connect"
 
 
 @pytest.mark.asyncio

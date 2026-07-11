@@ -3,22 +3,27 @@ package hub
 import (
 	"encoding/json"
 	"log"
+	"strings"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
 
 type FlowRecord struct {
-	Node       string   `json:"node"`
-	Timestamp  string   `json:"timestamp"`
-	Method     string   `json:"method"`
-	Host       string   `json:"host"`
-	Path       string   `json:"path"`
-	StatusCode int      `json:"status_code"`
-	ReqSize    int      `json:"req_size"`
-	RespSize   int      `json:"resp_size"`
-	DurationMs int      `json:"duration_ms"`
-	Tags       []string `json:"tags"`
+	Node            string            `json:"node"`
+	Timestamp       string            `json:"timestamp"`
+	Method          string            `json:"method"`
+	Host            string            `json:"host"`
+	Path            string            `json:"path"`
+	StatusCode      int               `json:"status_code"`
+	ReqSize         int               `json:"req_size"`
+	RespSize        int               `json:"resp_size"`
+	DurationMs      int               `json:"duration_ms"`
+	ReqHeaders      map[string]string `json:"req_headers,omitempty"`
+	RespHeaders     map[string]string `json:"resp_headers,omitempty"`
+	ReqBody         string            `json:"req_body,omitempty"`
+	RespBody        string            `json:"resp_body,omitempty"`
+	Tags            []string          `json:"tags,omitempty"`
 }
 
 type IngestRequest struct {
@@ -56,10 +61,25 @@ func (h *Hub) handleIngestFlows(e *core.RequestEvent) error {
 		rec.Set("req_size", f.ReqSize)
 		rec.Set("resp_size", f.RespSize)
 		rec.Set("duration_ms", f.DurationMs)
+		if f.ReqHeaders != nil {
+			hdrJson, _ := json.Marshal(f.ReqHeaders)
+			rec.Set("req_headers", string(hdrJson))
+		}
+		if f.RespHeaders != nil {
+			hdrJson, _ := json.Marshal(f.RespHeaders)
+			rec.Set("resp_headers", string(hdrJson))
+		}
 		tagsJson, _ := json.Marshal(f.Tags)
 		rec.Set("tags", string(tagsJson))
 		if err := h.Save(rec); err != nil {
 			log.Printf("failed to save flow: %v", err)
+			continue
+		}
+		if f.ReqBody != "" {
+			h.storeFlowBody(rec.Id, "req", f.ReqBody)
+		}
+		if f.RespBody != "" {
+			h.storeFlowBody(rec.Id, "resp", f.RespBody)
 		}
 	}
 
@@ -86,7 +106,7 @@ func (h *Hub) handleGetFlow(e *core.RequestEvent) error {
 		}
 	}
 
-	result := map[string]any{
+		result := map[string]any{
 		"id":           rec.Get("id"),
 		"node":         rec.Get("node"),
 		"captured_at":  rec.Get("captured_at"),
@@ -108,18 +128,53 @@ func (h *Hub) handleGetFlow(e *core.RequestEvent) error {
 }
 
 func (h *Hub) handleListFlows(e *core.RequestEvent) error {
-	filter := "1=1"
+	var filters []string
 	params := dbx.Params{}
+
 	if node := e.Request.URL.Query().Get("node"); node != "" {
-		filter = "node = {:node}"
+		filters = append(filters, "node = {:node}")
 		params["node"] = node
 	}
+	if host := e.Request.URL.Query().Get("host"); host != "" {
+		filters = append(filters, "host ~ {:host}")
+		params["host"] = host
+	}
+	if method := e.Request.URL.Query().Get("method"); method != "" {
+		filters = append(filters, "method = {:method}")
+		params["method"] = method
+	}
+	if status := e.Request.URL.Query().Get("status"); status != "" {
+		filters = append(filters, "status_code = {:status}")
+		params["status"] = status
+	}
+
+	filter := "1=1"
+	if len(filters) > 0 {
+		filter = strings.Join(filters, " && ")
+	}
+
 	records, err := h.FindRecordsByFilter("flows", filter, "", 100, 0, params)
 	if err != nil {
 		log.Printf("flows query error: %v", err)
 		return e.InternalServerError("query failed", err)
 	}
 	return e.JSON(200, records)
+}
+
+func (h *Hub) storeFlowBody(flowID, direction, body string) {
+	bodyCol, err := h.FindCollectionByNameOrId("flow_bodies")
+	if err != nil {
+		log.Printf("flow_bodies collection not found: %v", err)
+		return
+	}
+	rec := core.NewRecord(bodyCol)
+	rec.Set("flow", flowID)
+	rec.Set("direction", direction)
+	rec.Set("body", body)
+	rec.Set("size", len(body))
+	if err := h.Save(rec); err != nil {
+		log.Printf("failed to save flow body: %v", err)
+	}
 }
 
 func (h *Hub) handleListNodes(e *core.RequestEvent) error {

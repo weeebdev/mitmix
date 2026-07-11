@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { listFlows } from '../api'
+  import { listFlows, fmtTime } from '../api'
   import type { Flow } from '../api'
   import FlowDetail from './FlowDetail.svelte'
 
@@ -9,9 +9,37 @@
   let error = $state('')
   let interval: number
 
+  let method = $state('')
+  let host = $state('')
+  let status = $state('')
+  let filterMethod = $state('')
+  let filterHost = $state('')
+  let filterStatus = $state('')
+
+  function getFilterParams(): { host?: string; method?: string; status?: string } {
+    const p: { host?: string; method?: string; status?: string } = {}
+    if (filterMethod) p.method = filterMethod
+    if (filterHost) p.host = filterHost
+    if (filterStatus) p.status = filterStatus
+    return p
+  }
+
   async function load() {
-    try { flows = await listFlows() }
+    try { flows = await listFlows(getFilterParams()) }
     catch (e: any) { error = e.message }
+  }
+
+  function applyFilters() {
+    filterMethod = method
+    filterHost = host
+    filterStatus = status
+    load()
+  }
+
+  function clearFilters() {
+    method = ''; host = ''; status = ''
+    filterMethod = ''; filterHost = ''; filterStatus = ''
+    load()
   }
 
   onMount(() => { load(); interval = setInterval(load, 5000) })
@@ -19,6 +47,17 @@
 </script>
 
 <div class="card"><h3>Captured Flows</h3><div class="val">{flows.length}</div></div>
+
+<div class="filter-bar">
+  <select bind:value={method}>
+    <option value="">All Methods</option>
+    <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option><option>PATCH</option>
+  </select>
+  <input type="text" placeholder="Host" bind:value={host} />
+  <input type="text" placeholder="Status" bind:value={status} />
+  <button onclick={applyFilters}>Apply</button>
+  <button class="clear" onclick={clearFilters}>Clear</button>
+</div>
 
 <div class="flows-layout">
   <div class="flows-table">
@@ -28,7 +67,7 @@
         {#if flows.length}
           {#each flows as f}
             <tr class:selected={selected?.id === f.id} onclick={() => selected = f}>
-              <td>{f.captured_at ? new Date(f.captured_at).toLocaleTimeString() : f.id?.slice(0, 8)}</td>
+              <td>{fmtTime(f.captured_at)}</td>
               <td>{f.method}</td><td>{f.host}</td><td>{f.path}</td>
               <td>{f.status_code}</td><td>{f.duration_ms}ms</td>
             </tr>
@@ -61,4 +100,9 @@
   tr:hover { background: #161b22; }
   tr.selected { background: #1c2128; }
   .empty { color: #8b949e; text-align: center; padding: 24px; }
+  .filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-bar select, .filter-bar input { padding: 4px 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px; }
+  .filter-bar button { padding: 4px 12px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  .filter-bar button:hover { background: #30363d; }
+  .filter-bar button.clear { color: #8b949e; }
 </style>

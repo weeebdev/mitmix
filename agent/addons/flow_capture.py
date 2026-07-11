@@ -7,11 +7,12 @@ logger = logging.getLogger("flow_capture")
 
 
 class FlowCapture:
-    def __init__(self, hub_url, token, batch_size=50, flush_interval=2.0):
+    def __init__(self, hub_url, token, batch_size=50, flush_interval=2.0, capture_body=True):
         self.hub_url = hub_url.rstrip("/")
         self.token = token
         self.batch_size = batch_size
         self.flush_interval = flush_interval
+        self.capture_body = capture_body
         self.queue: asyncio.Queue = asyncio.Queue()
         self._session: aiohttp.ClientSession | None = None
         self._task: asyncio.Task | None = None

@@ -7,6 +7,20 @@ function getToken(): string | null {
 function setToken(t: string) { localStorage.setItem('pb_token', t) }
 function clearToken() { localStorage.removeItem('pb_token') }
 
+export function fmtDate(s: string | undefined | null): string {
+  if (!s) return '-'
+  const n = Date.parse(s)
+  if (isNaN(n)) return '-'
+  return new Date(n).toLocaleString()
+}
+
+export function fmtTime(s: string | undefined | null): string {
+  if (!s) return '-'
+  const n = Date.parse(s)
+  if (isNaN(n)) return '-'
+  return new Date(n).toLocaleTimeString()
+}
+
 interface Flow {
   id: string
   node: string
@@ -67,10 +81,23 @@ export function isAuthed(): boolean { return !!getToken() }
 
 export function listNodes() { return api<Node[]>('GET', '/nodes') }
 export function listRules() { return api<Rule[]>('GET', '/rules') }
-export function listFlows() { return api<Flow[]>('GET', '/flows') }
+export function listFlows(params?: { host?: string; method?: string; status?: string }) {
+  let q = ''
+  if (params) {
+    const p: string[] = []
+    if (params.host) p.push('host=' + encodeURIComponent(params.host))
+    if (params.method) p.push('method=' + encodeURIComponent(params.method))
+    if (params.status) p.push('status=' + encodeURIComponent(params.status))
+    if (p.length) q = '?' + p.join('&')
+  }
+  return api<Flow[]>('GET', '/flows' + q)
+}
 export function listFlowsByNode(node: string) { return api<Flow[]>('GET', '/flows?node=' + encodeURIComponent(node)) }
 export function getFlowDetail(id: string) { return api<FlowDetail>('GET', '/flows/' + id) }
 export function createRule(r: Partial<Rule>) { return api<Rule>('POST', '/rules', r) }
+export function updateRule(id: string, data: Partial<Rule>) { return api<Rule>('PUT', '/rules/' + id, data) }
+export function deleteRule(id: string) { return api<{deleted: string}>('DELETE', '/rules/' + id) }
+export function reorderRules(ids: string[]) { return api<{ok: boolean}>('POST', '/rules/reorder', { ids }) }
 
 interface FlowDetail {
   id: string

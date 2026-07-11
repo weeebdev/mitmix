@@ -94,6 +94,9 @@ func (h *Hub) handleCreateRule(e *core.RequestEvent) error {
 	}
 
 	rec := core.NewRecord(col)
+	if req.Node == "" {
+		req.Node = "*"
+	}
 	rec.Set("node", req.Node)
 	rec.Set("priority", req.Priority)
 	rec.Set("action", req.Action)
@@ -107,4 +110,87 @@ func (h *Hub) handleCreateRule(e *core.RequestEvent) error {
 	}
 
 	return e.JSON(201, rec)
+}
+
+type UpdateRuleRequest struct {
+	Node     *string `json:"node,omitempty"`
+	Priority *int    `json:"priority,omitempty"`
+	Action   *string `json:"action,omitempty"`
+	Match    *string `json:"match,omitempty"`
+	Spec     *string `json:"spec,omitempty"`
+	Enabled  *bool   `json:"enabled,omitempty"`
+}
+
+func (h *Hub) handleUpdateRule(e *core.RequestEvent) error {
+	id := e.Request.PathValue("id")
+	rec, err := h.FindRecordById("rules", id)
+	if err != nil {
+		return e.NotFoundError("rule not found", nil)
+	}
+
+	var req UpdateRuleRequest
+	if err := e.BindBody(&req); err != nil {
+		return e.BadRequestError("invalid request", nil)
+	}
+
+	if req.Node != nil {
+		rec.Set("node", *req.Node)
+	}
+	if req.Priority != nil {
+		rec.Set("priority", *req.Priority)
+	}
+	if req.Action != nil {
+		rec.Set("action", *req.Action)
+	}
+	if req.Match != nil {
+		rec.Set("match", *req.Match)
+	}
+	if req.Spec != nil {
+		rec.Set("spec", *req.Spec)
+	}
+	if req.Enabled != nil {
+		rec.Set("enabled", *req.Enabled)
+	}
+
+	if err := h.Save(rec); err != nil {
+		log.Printf("update rule error: %v", err)
+		return e.InternalServerError("save failed", nil)
+	}
+
+	return e.JSON(200, rec)
+}
+
+func (h *Hub) handleDeleteRule(e *core.RequestEvent) error {
+	id := e.Request.PathValue("id")
+	rec, err := h.FindRecordById("rules", id)
+	if err != nil {
+		return e.NotFoundError("rule not found", nil)
+	}
+	if err := h.Delete(rec); err != nil {
+		log.Printf("delete rule error: %v", err)
+		return e.InternalServerError("delete failed", nil)
+	}
+	return e.JSON(200, map[string]any{"deleted": id})
+}
+
+type ReorderRequest struct {
+	IDs []string `json:"ids"`
+}
+
+func (h *Hub) handleReorderRules(e *core.RequestEvent) error {
+	var req ReorderRequest
+	if err := e.BindBody(&req); err != nil {
+		return e.BadRequestError("invalid request", nil)
+	}
+	for i, id := range req.IDs {
+		rec, err := h.FindRecordById("rules", id)
+		if err != nil {
+			continue
+		}
+		rec.Set("priority", (i+1)*10)
+		if err := h.Save(rec); err != nil {
+			log.Printf("reorder save error: %v", err)
+		}
+	}
+	return e.JSON(200, map[string]any{"ok": true})
 }

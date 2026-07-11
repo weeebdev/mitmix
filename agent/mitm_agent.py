@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import logging
 import threading
+import time
 
 from mitmproxy import options
 from mitmproxy.tools import dump
@@ -36,17 +37,27 @@ class AgentAddon:
             host = flow.request.host
             if flow.request.scheme and flow.request.port:
                 host = f"{host}:{flow.request.port}"
+            req_headers = dict(flow.request.headers) if flow.request.headers else {}
+            resp_headers = dict(flow.response.headers) if flow.response and flow.response.headers else {}
+            req_body = (flow.request.content or b"")[:102400].decode("utf-8", errors="replace")
+            resp_body = (flow.response.content or b"")[:102400].decode("utf-8", errors="replace") if flow.response else ""
             record = {
                 "node": f"{flow.server_conn.peername[0]}" if flow.server_conn.peername else "",
-                "timestamp": str(flow.request.timestamp_start),
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(flow.request.timestamp_start)),
                 "method": flow.request.method or "",
                 "host": host,
                 "path": flow.request.path or "",
                 "status_code": flow.response.status_code if flow.response else 0,
+                "req_content_type": flow.request.headers.get("Content-Type", ""),
+                "resp_content_type": flow.response.headers.get("Content-Type", "") if flow.response else "",
+                "req_headers": req_headers,
+                "resp_headers": resp_headers,
+                "req_body": req_body,
+                "resp_body": resp_body,
                 "req_size": len(flow.request.content or b""),
                 "resp_size": len(flow.response.content or b"") if flow.response else 0,
                 "duration_ms": int((flow.response.timestamp_end - flow.request.timestamp_start) * 1000) if flow.response else 0,
-                "tags": [],
+                "tags": list(flow.tags) if hasattr(flow, 'tags') else [],
             }
             logger.debug("captured %s %s -> %s", record["method"], record["host"], record["status_code"])
             self.flow_capture.enqueue(record)
