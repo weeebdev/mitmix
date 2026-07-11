@@ -55,7 +55,7 @@ async def test_post_batch_success():
         closed = False
         def post(self, url, json=None):
             captured["url"] = url
-            captured["json"] = json
+            captured["json"] = json["flows"] if json else []
             return FakeCtx(FakeResp())
 
         async def close(self):
@@ -121,7 +121,7 @@ async def test_flush_loop_batches_by_size(monkeypatch):
     class FakeSession:
         closed = False
         def post(self, url, json=None):
-            posted_batches.append(json)
+            posted_batches.append(json["flows"] if json else [])
             return FakeCtx(FakeResp())
 
         async def close(self):
