@@ -47,8 +47,9 @@ apply them to live traffic, and stream captured flows back.
 | GET | `/api/mitm/agent-connect` | WebSocket upgrade for agents (X-Token header) |
 | POST | `/api/mitm/flows` | Batch flow ingest (JSON body: `{"flows": [...]}`) |
 | GET | `/api/mitm/flows` | List captured flows |
-| GET | `/api/mitm/nodes` | List agent nodes |
+| POST | `/api/mitm/rules` | Create a new rule (triggers live push to agents) |
 | GET | `/api/mitm/rules` | List rules |
+| GET | `/api/mitm/nodes` | List agent nodes |
 
 ## Status
 Phase 1 (hub skeleton) + Phase 2 (agent skeleton) complete. Active development.

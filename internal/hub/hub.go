@@ -60,6 +60,8 @@ func (h *Hub) registerRoutes(se *core.ServeEvent) {
 	api.POST("/flows", h.handleIngestFlows)
 	api.GET("/flows", h.handleListFlows)
 
-	api.GET("/nodes", h.handleListNodes)
 	api.GET("/rules", h.handleListRules)
+	api.POST("/rules", h.handleCreateRule)
+
+	api.GET("/nodes", h.handleListNodes)
 }

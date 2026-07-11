@@ -63,3 +63,48 @@ func (h *Hub) handleListRules(e *core.RequestEvent) error {
 	}
 	return e.JSON(200, records)
 }
+
+type CreateRuleRequest struct {
+	Node     string `json:"node"`
+	Priority int    `json:"priority"`
+	Action   string `json:"action"`
+	Match    string `json:"match"`
+	Spec     string `json:"spec"`
+	Enabled  bool   `json:"enabled"`
+}
+
+func (h *Hub) handleCreateRule(e *core.RequestEvent) error {
+	var req CreateRuleRequest
+	if err := e.BindBody(&req); err != nil {
+		return e.BadRequestError("invalid request", nil)
+	}
+	if req.Action == "" {
+		return e.BadRequestError("action is required", nil)
+	}
+	if req.Match == "" {
+		req.Match = "{}"
+	}
+	if req.Spec == "" {
+		req.Spec = "{}"
+	}
+
+	col, err := h.FindCollectionByNameOrId("rules")
+	if err != nil {
+		return e.InternalServerError("collection not found", nil)
+	}
+
+	rec := core.NewRecord(col)
+	rec.Set("node", req.Node)
+	rec.Set("priority", req.Priority)
+	rec.Set("action", req.Action)
+	rec.Set("match", req.Match)
+	rec.Set("spec", req.Spec)
+	rec.Set("enabled", req.Enabled)
+
+	if err := h.Save(rec); err != nil {
+		log.Printf("create rule error: %v", err)
+		return e.InternalServerError("save failed", nil)
+	}
+
+	return e.JSON(201, rec)
+}
