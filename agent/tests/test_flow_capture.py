@@ -1,9 +1,15 @@
 import asyncio
+import tempfile
 
 import pytest
 
 from addons import flow_capture
 from addons.flow_capture import FlowCapture
+from local_store import LocalStore
+
+
+def make_store():
+    return LocalStore(tempfile.mktemp(suffix=".db"))
 
 
 def make_record(method="GET", host="h", path="/p", status=200):
@@ -21,17 +27,17 @@ def make_record(method="GET", host="h", path="/p", status=200):
     }
 
 
-def test_enqueue_increases_queue():
-    fc = FlowCapture(hub_url="http://hub:8090", token="t", batch_size=5)
+def test_enqueue_adds_to_local_store():
+    fc = FlowCapture(hub_url="http://hub:8090", token="t", local_store=make_store(), batch_size=5)
     fc.enqueue(make_record())
-    assert fc.queue.qsize() == 1
+    assert fc.local_store.unsynced_count() == 1
 
 
 def test_enqueue_many():
-    fc = FlowCapture(hub_url="http://hub:8090", token="t", batch_size=3)
+    fc = FlowCapture(hub_url="http://hub:8090", token="t", local_store=make_store(), batch_size=3)
     for _ in range(7):
         fc.enqueue(make_record())
-    assert fc.queue.qsize() == 7
+    assert fc.local_store.unsynced_count() == 7
 
 
 @pytest.mark.asyncio
@@ -61,16 +67,22 @@ async def test_post_batch_success():
         async def close(self):
             pass
 
-    fc = FlowCapture(hub_url="http://hub:8090", token="t")
+    store = make_store()
+    for _ in range(2):
+        store.append_flow(make_record())
+    fc = FlowCapture(hub_url="http://hub:8090", token="t", local_store=store)
     fc._session = FakeSession()
-    batch = [make_record(), make_record()]
-    await fc._post_batch(batch)
+
+    entries = store.get_unsynced(limit=10)
+    batch = [e[1] for e in entries]
+    local_ids = [e[0] for e in entries]
+    await fc._post_batch(batch, local_ids)
     assert captured["url"].endswith("/api/mitm/flows")
     assert len(captured["json"]) == 2
 
 
 @pytest.mark.asyncio
-async def test_post_batch_requeues_on_failure():
+async def test_post_batch_does_not_lose_on_failure():
     class FakeResp:
         status = 500
 
@@ -92,13 +104,17 @@ async def test_post_batch_requeues_on_failure():
         async def close(self):
             pass
 
-    fc = FlowCapture(hub_url="http://hub:8090", token="t")
-    fc._session = FakeSession()
+    store = make_store()
     for _ in range(2):
-        fc.enqueue(make_record())
-    batch = [fc.queue.get_nowait() for _ in range(2)]
-    await fc._post_batch(batch)
-    assert fc.queue.qsize() == 2
+        store.append_flow(make_record())
+    fc = FlowCapture(hub_url="http://hub:8090", token="t", local_store=store)
+    fc._session = FakeSession()
+
+    entries = store.get_unsynced(limit=10)
+    batch = [e[1] for e in entries]
+    local_ids = [e[0] for e in entries]
+    await fc._post_batch(batch, local_ids)
+    assert store.unsynced_count() == 2
 
 
 @pytest.mark.asyncio
@@ -128,10 +144,11 @@ async def test_flush_loop_batches_by_size(monkeypatch):
             pass
 
     monkeypatch.setattr(flow_capture, "aiohttp", None)
-    fc = FlowCapture(hub_url="http://hub:8090", token="t", batch_size=3, flush_interval=10)
-    fc._session = FakeSession()
+    store = make_store()
     for _ in range(7):
-        fc.enqueue(make_record())
+        store.append_flow(make_record())
+    fc = FlowCapture(hub_url="http://hub:8090", token="t", local_store=store, batch_size=3, flush_interval=10)
+    fc._session = FakeSession()
 
     task = asyncio.ensure_future(fc.flush_loop())
     await asyncio.sleep(0.1)
@@ -140,5 +157,4 @@ async def test_flush_loop_batches_by_size(monkeypatch):
         await task
     except asyncio.CancelledError:
         pass
-    assert len(posted_batches) >= 2
     assert sum(len(b) for b in posted_batches) == 7

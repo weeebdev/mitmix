@@ -8,20 +8,20 @@ from ws_client import HubWebSocketClient
 
 @pytest.mark.asyncio
 async def test_builds_ws_url_from_http():
-    c = HubWebSocketClient(hub_url="http://localhost:8090", token="tok", on_rules=lambda r: None, flow_sink=lambda f: None)
-    assert c.ws_url == "ws://localhost:8090/api/mitm/agent-connect"
+    c = HubWebSocketClient(hub_url="http://localhost:8090", token="tok", on_rules=lambda r: None, flow_sink=lambda f: None, local_store=None)
+    assert c.ws_url == "ws://localhost:8090/ws/agent-connect"
 
 
 @pytest.mark.asyncio
 async def test_builds_ws_url_from_https():
-    c = HubWebSocketClient(hub_url="https://hub.example.com", token="tok", on_rules=lambda r: None, flow_sink=lambda f: None)
-    assert c.ws_url == "wss://hub.example.com/api/mitm/agent-connect"
+    c = HubWebSocketClient(hub_url="https://hub.example.com", token="tok", on_rules=lambda r: None, flow_sink=lambda f: None, local_store=None)
+    assert c.ws_url == "wss://hub.example.com/ws/agent-connect"
 
 
 @pytest.mark.asyncio
 async def test_handle_rules_message_calls_on_rules():
     received = []
-    c = HubWebSocketClient(hub_url="http://h:8090", token="t", on_rules=received.extend, flow_sink=lambda f: None)
+    c = HubWebSocketClient(hub_url="http://h:8090", token="t", on_rules=received.extend, flow_sink=lambda f: None, local_store=None)
     await c._handle(None, {"action": "rules", "data": [{"id": "r1", "action": "record"}]})
     assert received == [{"id": "r1", "action": "record"}]
 
@@ -29,15 +29,14 @@ async def test_handle_rules_message_calls_on_rules():
 @pytest.mark.asyncio
 async def test_handle_rule_upsert_calls_on_rules():
     received = []
-    c = HubWebSocketClient(hub_url="http://h:8090", token="t", on_rules=received.extend, flow_sink=lambda f: None)
+    c = HubWebSocketClient(hub_url="http://h:8090", token="t", on_rules=received.extend, flow_sink=lambda f: None, local_store=None)
     await c._handle(None, {"action": "rule_upsert", "data": {"id": "r2", "action": "drop"}})
-    # upsert sends a list with 1 item
     assert received == [{"id": "r2", "action": "drop"}]
 
 
 @pytest.mark.asyncio
 async def test_handle_unknown_action_noop():
-    c = HubWebSocketClient(hub_url="http://h:8090", token="t", on_rules=lambda r: None, flow_sink=lambda f: None)
+    c = HubWebSocketClient(hub_url="http://h:8090", token="t", on_rules=lambda r: None, flow_sink=lambda f: None, local_store=None)
     result = await c._handle(None, {"action": "ping"})
     assert result is True
 
@@ -50,7 +49,7 @@ async def test_handle_auth_challenge_returns_true(monkeypatch):
         async def send(self, data):
             sent.append(json.loads(data))
 
-    c = HubWebSocketClient(hub_url="http://h:8090", token="t", on_rules=lambda r: None, flow_sink=lambda f: None)
+    c = HubWebSocketClient(hub_url="http://h:8090", token="t", on_rules=lambda r: None, flow_sink=lambda f: None, local_store=None)
     result = await c._handle(FakeWS(), {"action": "auth_challenge", "data": {"nonce": "test"}})
     assert result is True
     assert sent[-1]["action"] == "auth_response"

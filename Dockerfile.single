@@ -1,0 +1,46 @@
+# ============================================================
+# Stage 1: build hub (Go binary)
+# ============================================================
+FROM golang:1.22-alpine AS hub-builder
+RUN apk add --no-cache gcc musl-dev
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o hub .
+
+# ============================================================
+# Stage 2: install agent (Python mitmproxy)
+# ============================================================
+FROM python:3.12-slim AS agent-base
+RUN pip install --no-cache-dir mitmproxy==11.1.4
+
+# ============================================================
+# Stage 3: final single image
+# ============================================================
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    supervisor procps ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=hub-builder /build/hub /usr/local/bin/hub
+COPY --from=agent-base /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=agent-base /usr/local/bin/mitmdump /usr/local/bin/mitmdump
+COPY --from=agent-base /usr/local/bin/mitmproxy /usr/local/bin/mitmproxy
+COPY --from=agent-base /usr/local/bin/mitmweb /usr/local/bin/mitmweb
+
+RUN pip install --no-cache-dir aiohttp websockets
+
+COPY agent/ /agent/
+WORKDIR /agent
+
+COPY supervisord.conf /etc/supervisor/conf.d/mitmix.conf
+
+EXPOSE 8090 8082
+
+ENV HUB_ADMIN_EMAIL=admin@mitmix.local
+ENV HUB_ADMIN_PASSWORD=mitmixadmin123
+ENV AGENT_TOKEN=node-default
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/mitmix.conf", "-n"]

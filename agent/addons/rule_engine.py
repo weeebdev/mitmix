@@ -1,11 +1,12 @@
+import asyncio
 import fnmatch
 import logging
 import re
 
+import aiohttp
 from mitmproxy import http
 
 logger = logging.getLogger("rule_engine")
-
 
 ACTION_INTERCEPT = "intercept"
 ACTION_MODIFY_HEADERS = "modify_headers"
@@ -13,6 +14,9 @@ ACTION_MODIFY_BODY = "modify_body"
 ACTION_REDIRECT = "redirect"
 ACTION_DROP = "drop"
 ACTION_RECORD = "record"
+ACTION_COPY_REQUEST = "copy_request"
+ACTION_REPLICATE = "replicate"
+ACTION_REWRITE = "rewrite"
 ACTIONS = {
     ACTION_INTERCEPT,
     ACTION_MODIFY_HEADERS,
@@ -20,6 +24,9 @@ ACTIONS = {
     ACTION_REDIRECT,
     ACTION_DROP,
     ACTION_RECORD,
+    ACTION_COPY_REQUEST,
+    ACTION_REPLICATE,
+    ACTION_REWRITE,
 }
 
 
@@ -107,12 +114,60 @@ class RuleEngine:
                 flow.request.text = text
         elif rule["action"] == ACTION_INTERCEPT:
             flow.intercept()
-        # ACTION_RECORD handled by flow_capture; no request-side change
+        elif rule["action"] == ACTION_REPLICATE:
+            urls = spec.get("urls", [])
+            if urls:
+                headers = dict(flow.request.headers)
+                body = flow.request.content
+                method = flow.request.method
+                for url in urls:
+                    asyncio.create_task(self._replicate(url, method, headers, body))
+                flow.tags.add("replicated")
+        elif rule["action"] == ACTION_REWRITE:
+            set_host = spec.get("set_host")
+            if set_host:
+                flow.request.host = set_host
+            set_path = spec.get("set_path")
+            if set_path is not None:
+                flow.request.path = set_path
+            set_method = spec.get("set_method")
+            if set_method:
+                flow.request.method = set_method
+            for k, v in spec.get("set_header", {}).items():
+                flow.request.headers[k] = v
+            for k in spec.get("remove_header", []):
+                flow.request.headers.pop(k, None)
 
     def response(self, flow):
         for rule in self.matching(flow):
+            spec = rule["spec"]
             if rule["action"] == ACTION_MODIFY_HEADERS:
-                for k, v in rule["spec"].get("resp_set", {}).items():
+                for k, v in spec.get("resp_set", {}).items():
                     flow.response.headers[k] = v
-                for k in rule["spec"].get("resp_remove", []):
+                for k in spec.get("resp_remove", []):
                     flow.response.headers.pop(k, None)
+            elif rule["action"] == ACTION_COPY_REQUEST:
+                flow.metadata["copy"] = True
+                flow.tags.add("copied")
+            elif rule["action"] == ACTION_REWRITE:
+                find = spec.get("find")
+                replace = spec.get("replace")
+                if find is not None and replace is not None and flow.response.content:
+                    try:
+                        flow.response.text = flow.response.text.replace(find, replace)
+                    except Exception as e:
+                        logger.warning("rewrite failed: %s", e)
+
+    async def _replicate(self, url, method, headers, body):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.request(
+                    method=method,
+                    url=url,
+                    headers=headers,
+                    data=body,
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as resp:
+                    logger.info("replicated %s %s -> %d", method, url, resp.status)
+        except Exception as e:
+            logger.warning("replicate %s %s failed: %s", method, url, e)

@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { getFlowDetail } from '../api'
-  import type { FlowDetail } from '../api'
-  import type { Flow } from '../api'
+  import { getFlowDetail, createRule, fmtDate } from '../api'
+  import type { FlowDetail, Flow } from '../api'
 
   let { flow, onclose }: { flow: Flow; onclose: () => void } = $props()
 
@@ -9,18 +8,62 @@
   let loading = $state(true)
   let error = $state('')
   let tab = $state('overview')
+  let copied = $state(false)
+  let showRuleForm = $state(false)
+  let ruleCreated = $state(false)
+  let creating = $state(false)
 
   $effect(() => {
     loading = true
     error = ''
     getFlowDetail(flow.id).then(d => { detail = d; loading = false }).catch(e => { error = e.message; loading = false })
   })
+
+  function copyCurl() {
+    if (!detail) return
+    let cmd = `curl -X ${detail.method}`
+    if (detail.req_headers) {
+      for (const [k, vals] of Object.entries(detail.req_headers)) {
+        const h = Array.isArray(vals) ? vals.join(', ') : vals
+        cmd += ` -H '${k}: ${h}'`
+      }
+    }
+    if (detail.req_body) {
+      cmd += ` -d '${detail.req_body.replace(/'/g, "\\'")}'`
+    }
+    cmd += ` 'http://${detail.host}${detail.path}'`
+    navigator.clipboard.writeText(cmd)
+    copied = true
+    setTimeout(() => copied = false, 2000)
+  }
+
+  async function writeRule() {
+    if (!detail) return
+    creating = true
+    try {
+      const match = JSON.stringify({ host: detail.host, path: detail.path, method: detail.method })
+      await createRule({ node: '*', priority: 0, action: 'record', match, spec: '{}', enabled: true })
+      ruleCreated = true
+      showRuleForm = false
+      setTimeout(() => ruleCreated = false, 3000)
+    } catch (e: any) {
+      alert('Failed: ' + e.message)
+    } finally {
+      creating = false
+    }
+  }
 </script>
 
 <div class="panel">
   <div class="panel-header">
     <h3>Flow Detail</h3>
-    <button class="close" onclick={onclose}>&times;</button>
+    <div class="header-actions">
+      <button class="btn-action" onclick={copyCurl}>{copied ? 'Copied!' : 'Copy as cURL'}</button>
+      <button class="btn-action" onclick={() => showRuleForm = !showRuleForm}>
+        {showRuleForm ? 'Cancel' : 'Write Rule'}
+      </button>
+      <button class="close" onclick={onclose}>&times;</button>
+    </div>
   </div>
 
   {#if loading}
@@ -43,7 +86,7 @@
         <div class="field"><label>Duration</label><span>{detail.duration_ms}ms</span></div>
         <div class="field"><label>Req Size</label><span>{detail.req_size} bytes</span></div>
         <div class="field"><label>Resp Size</label><span>{detail.resp_size} bytes</span></div>
-        <div class="field"><label>Captured</label><span>{new Date(detail.captured_at).toLocaleString()}</span></div>
+        <div class="field"><label>Captured</label><span>{fmtDate(detail.captured_at)}</span></div>
       {:else if tab === 'request'}
         <h4>Headers</h4>
         <div class="headers">
@@ -72,13 +115,33 @@
         <pre class="body">{detail.resp_body || '(empty)'}</pre>
       {/if}
     </div>
+
+    {#if showRuleForm}
+      <div class="rule-form">
+        <h4>New Rule from Flow</h4>
+        <div class="field"><label>Method</label><span class="mono">{detail.method}</span></div>
+        <div class="field"><label>Host</label><span>{detail.host}</span></div>
+        <div class="field"><label>Path</label><span class="mono">{detail.path}</span></div>
+        <div class="rule-actions">
+          <button onclick={writeRule} disabled={creating}>{creating ? 'Creating...' : 'Create Rule'}</button>
+          <button class="btn-cancel" onclick={() => showRuleForm = false}>Cancel</button>
+        </div>
+      </div>
+    {/if}
+
+    {#if ruleCreated}
+      <div class="toast">Rule created!</div>
+    {/if}
   {/if}
 </div>
 
 <style>
   .panel { background: #161b22; border: 1px solid #30363d; border-radius: 6px; width: 480px; max-height: calc(100vh - 120px); overflow-y: auto; position: sticky; top: 0; }
-  .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #30363d; }
-  .panel-header h3 { font-size: 14px; color: #c9d1d9; }
+  .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #30363d; gap: 8px; }
+  .panel-header h3 { font-size: 14px; color: #c9d1d9; white-space: nowrap; }
+  .header-actions { display: flex; gap: 4px; align-items: center; }
+  .btn-action { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; }
+  .btn-action:hover { background: #30363d; }
   .close { background: none; border: none; color: #8b949e; font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1; }
   .close:hover { color: #f85149; }
   .loading, .error { padding: 24px; text-align: center; color: #8b949e; }
@@ -98,4 +161,13 @@
   .hdr-key { color: #79c0ff; margin-right: 8px; }
   .body { background: #0d1117; padding: 12px; border-radius: 4px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.4; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
   .empty { color: #8b949e; font-size: 12px; }
+  .rule-form { padding: 12px 16px; border-top: 1px solid #30363d; background: #0d1117; }
+  .rule-form h4 { margin: 0 0 8px; }
+  .rule-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .rule-actions button { padding: 6px 16px; background: #238636; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .rule-actions button:hover { background: #2ea043; }
+  .rule-actions button:disabled { opacity: 0.6; cursor: default; }
+  .btn-cancel { background: #21262d !important; color: #c9d1d9 !important; border: 1px solid #30363d !important; }
+  .btn-cancel:hover { background: #30363d !important; }
+  .toast { position: sticky; bottom: 0; padding: 8px 16px; background: #238636; color: #fff; font-size: 12px; text-align: center; }
 </style>

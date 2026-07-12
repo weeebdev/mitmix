@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { listFlows } from '../api'
+  import { listFlows, fmtDate, fmtTime } from '../api'
   import type { Node, Flow } from '../api'
 
   let { node, onclose }: { node: Node, onclose: () => void } = $props()
@@ -35,7 +35,7 @@
       <dt>Status</dt><dd class="status-{node.status}">{node.status || 'down'}</dd>
       <dt>Fingerprint</dt><dd>{node.fingerprint || '-'}</dd>
       <dt>Version</dt><dd>{node.version || '-'}</dd>
-      <dt>Last Seen</dt><dd>{node.last_seen ? new Date(node.last_seen).toLocaleString() : '-'}</dd>
+      <dt>Last Seen</dt><dd>{fmtDate(node.last_seen)}</dd>
     </dl>
   </section>
 
@@ -55,7 +55,7 @@
         <tbody>
           {#each flows as f}
             <tr>
-              <td>{f.captured_at ? new Date(f.captured_at).toLocaleTimeString() : f.id?.slice(0, 8)}</td>
+              <td>{fmtTime(f.captured_at)}</td>
               <td>{f.method}</td><td>{f.host}</td><td>{f.path}</td>
               <td>{f.status_code}</td><td>{f.duration_ms}ms</td>
             </tr>
@@ -73,8 +73,8 @@
     <h3>Connection Activity</h3>
     {#if node.last_seen}
       <ul class="activity">
-        <li>Last seen: {new Date(node.last_seen).toLocaleString()}</li>
-        <li>Last flow: {flows.length ? new Date(flows[0].captured_at).toLocaleString() : 'N/A'}</li>
+        <li>Last seen: {fmtDate(node.last_seen)}</li>
+        <li>Last flow: {flows.length ? fmtDate(flows[0].captured_at) : 'N/A'}</li>
         <li>Total flows: {flows.length}</li>
         <li>Node status: {node.status || 'unknown'}</li>
       </ul>

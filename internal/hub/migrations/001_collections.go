@@ -64,6 +64,8 @@ func init() {
       { "name": "host", "type": "text", "max": 512 },
       { "name": "path", "type": "text", "max": 2048 },
       { "name": "status_code", "type": "number", "onlyInt": true },
+      { "name": "req_content_type", "type": "text", "max": 255 },
+      { "name": "resp_content_type", "type": "text", "max": 255 },
       { "name": "req_headers", "type": "json" },
       { "name": "resp_headers", "type": "json" },
       { "name": "req_size", "type": "number", "onlyInt": true },

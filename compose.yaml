@@ -15,7 +15,7 @@ services:
       dockerfile: agent/Dockerfile.agent
     restart: unless-stopped
     network_mode: host
-    command: ["--hub", "ws://localhost:8090", "--token", "test-agent-token"]
+    command: ["--hub", "ws://localhost:8090", "--token", "test-agent-token", "--listen", "0.0.0.0:8082"]
     depends_on:
       - hub
 
