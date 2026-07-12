@@ -70,7 +70,7 @@ func (h *Hub) handleMCP(e *core.RequestEvent) error {
 				"tools": map[string]any{},
 			},
 			"serverInfo": map[string]any{
-				"name":    "mitm-decentralized",
+				"name":    "mitmix",
 				"version": "0.1.0",
 			},
 		}

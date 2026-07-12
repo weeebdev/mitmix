@@ -20,7 +20,7 @@
 
 <div class="wrap">
   <form onsubmit={submit}>
-    <h1>mitm-decentralized</h1>
+    <h1>mitmix</h1>
     <p class="sub">Sign in to your account</p>
     {#if error}<div class="error">{error}</div>{/if}
     <label>Email <input type="text" bind:value={identity} placeholder="admin@mitm.local" /></label>

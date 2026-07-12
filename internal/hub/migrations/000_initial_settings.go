@@ -8,7 +8,7 @@ import (
 func init() {
 	m.Register(func(app core.App) error {
 		settings := app.Settings()
-		settings.Meta.AppName = "mitm-decentralized"
+		settings.Meta.AppName = "mitmix"
 		settings.Meta.HideControls = true
 		app.Save(settings)
 		return nil
