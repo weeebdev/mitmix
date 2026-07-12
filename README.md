@@ -1,8 +1,27 @@
-# mitm-decentralized
+# mitmix
 
-A **decentralized mitmproxy** on the Beszel hub/agent model. Go hub embeds
+A **decentralized mitmproxy** — hub/agent architecture. Go hub embeds
 PocketBase, Python agents run native mitmproxy addons, all state in
-PocketBase collections. LLM agents interact via MCP.
+PocketBase. LLM agents interact via MCP.
+
+## Quick start
+
+```sh
+git clone https://github.com/weeebdev/mitmix
+cd mitmix
+
+# Option A — single container (hub + agent)
+docker build -t mitmix -f Dockerfile.single .
+docker run -p 8090:8090 -p 8082:8082 mitmix
+
+# Option B — compose (separate containers)
+AGENT_TOKEN=test-agent-token docker compose up
+
+# Hub :8090, agent proxy :8082
+# Admin: admin@mitmix.local / mitmixadmin123
+```
+
+Point your browser proxy at `localhost:8082`, then open `http://localhost:8090`.
 
 ## Components
 
@@ -19,7 +38,7 @@ PocketBase collections. LLM agents interact via MCP.
 LLM Agent (Claude, etc.)
    │  MCP over HTTP (/mcp)
    ▼
-Hub (Go + PocketBase)
+Hub (Go + PocketBase) :8090
    │  WS /ws/agent-connect  ◄── Agent (Python/mitmproxy) :8082
    │  POST /api/mitm/flows  ◄── Agent (batched flow upload)
    │  /dashboard            ►── Browser
@@ -32,46 +51,48 @@ Hub (Go + PocketBase)
 Agents dial **out** only — no inbound port needed (NAT-friendly). Rule matching
 lives in the agent (low latency); hub is source of truth + realtime distributor.
 
-## Quick start
-
-```sh
-git clone https://github.com/adil/mitm-decentralized
-cd mitm-decentralized
-
-# Hub
-nix develop && go run . serve
-# -> PocketBase on :8090, admin admin@mitm.local / mitmadmin123
-
-# Agent (separate terminal)
-cd agent && pip install -e . && python mitm_agent.py --hub ws://localhost:8090 --token test-agent-token
-
-# Or Docker
-docker compose up
-# Hub :8090, agent proxy :8082
-```
-
 ## Features
 
 ### Dashboard (`/dashboard`)
 
 Svelte 5 app embedded in the Go binary.
 
-- **Login** — PB superuser auth, token stored in localStorage
-- **Flows** — list with filtering (host, method, status), detail panel with
-  Overview/Request/Response tabs (headers + truncated body)
-- **Rules** — create/edit/delete, drag-and-drop reorder, write rule from flow
-- **Nodes** — list with status, detail view with recent flows
+- **Dashboard** — Beszel-style charts: flow rate (line), status codes (donut),
+  top hosts/paths/methods (bar charts)
+- **Flows** — paginated list with filtering (host, method, status). Detail panel
+  with Overview/Request/Response tabs (headers + truncated body). Export as cURL
+  or HAR 1.2. Live streaming via WebSocket.
+- **Rules** — create/edit/delete, drag-and-drop reorder, dry-run against test
+  flow data, write rule from flow
+- **Nodes** — list with status, detail view with agent config info, recent flows
 - **Tokens** — generate (crypto/rand base62), copy, revoke
-- **Copy as cURL** — from flow detail
+- **Queries** — save named filters, run with one click
+- **Alerts** — live stream of node up/down events, webhook support
+- **MCP Console** — pick tool, fill args, call `/mcp` directly from UI
 
 ### Agent local store
 
-All agents store rules + flows in local SQLite (`~/.mitm-agent/store.db`):
+SQLite at `~/.mitm-agent/store.db`. Rules cached on WS connect, loaded from
+cache on startup. Flows written immediately to SQLite, uploaded async via
+background flush loop. Survives hub outages — queued flows sync on reconnect.
+Cleanup deletes synced flows after 24h.
 
-- Rules cached on WS connect, loaded from cache on startup
-- Flows written to SQLite immediately, uploaded to hub asynchronously
-- Survives hub outages — queued flows sync on reconnect
-- Cleanup: synced flows purged after 24h
+### Selective URL routing
+
+Use `--allow-hosts` / `--ignore-hosts` to control which traffic goes through
+the proxy:
+
+```sh
+# Only proxy *.example.com and *.myapp.internal
+python mitm_agent.py --hub ws://... --token ... \
+  --allow-hosts "*.example.com,*.myapp.internal"
+
+# Proxy everything except *.internal
+python mitm_agent.py --hub ws://... --token ... \
+  --ignore-hosts "*.internal"
+```
+
+Glob patterns supported (`*`, `?`, `*.example.com`).
 
 ### MCP server (`POST /mcp`)
 
@@ -88,8 +109,6 @@ Streamable HTTP transport, PB Bearer auth required. 9 tools:
 | `toggle_rule` | Enable/disable by rule_id |
 | `list_flows` | List flows with filters (host, path, method, status, limit, offset) |
 | `get_flow` | Full flow detail including request/response bodies |
-
-Usage with any MCP client (Claude Code, etc.):
 
 ```json
 POST /mcp
@@ -128,26 +147,41 @@ Agents authenticate via `X-Token` header on WS upgrade:
 4. On rule CRUD: hub broadcasts `rule_upsert` or `rule_delete` deltas
 5. Hub sends PING every 30s, agent responds PONG
 
-### API reference
+Dashboard WS at `/ws/dash` pushes `flow_created`, `node_up`, `node_down`,
+`alert` events in real time.
+
+## API reference
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/ws/agent-connect` | X-Token | WS upgrade for agents |
-| POST | `/api/mitm/flows` | X-Token | Batch flow ingest with bodies |
-| GET | `/api/mitm/flows` | PB | List flows (?host=, ?method=, ?status=) |
+| GET | `/ws/dash` | — | Dashboard live streaming |
+| POST | `/api/mitm/flows` | X-Token | Batch flow ingest (+ body capture, trunc 100KB) |
+| GET | `/api/mitm/flows` | PB | List flows (?host=, ?method=, ?status=, ?limit=, ?offset=) |
 | GET | `/api/mitm/flows/{id}` | PB | Flow detail with bodies |
+| GET | `/api/mitm/flows/{id}/curl` | PB | Export as cURL command (plain text) |
+| GET | `/api/mitm/flows/{id}/har` | PB | Export as HAR 1.2 JSON |
+| GET | `/api/mitm/stats` | PB | Dashboard stats (flow rate, status breakdown, top hosts/paths/methods) |
 | GET | `/api/mitm/rules` | PB | List rules |
-| POST | `/api/mitm/rules` | PB | Create rule (WS broadcast) |
+| POST | `/api/mitm/rules` | PB | Create rule (validates action, WS broadcast) |
 | PUT | `/api/mitm/rules/{id}` | PB | Update rule |
 | DELETE | `/api/mitm/rules/{id}` | PB | Delete rule |
-| POST | `/api/mitm/rules/reorder` | PB | Batch-reorder rules |
+| POST | `/api/mitm/rules/reorder` | PB | Batch-reorder by priority |
+| POST | `/api/mitm/rules/dry-run` | PB | Test rule `{rule, flow}` → `{matched, valid, summary}` |
 | GET | `/api/mitm/nodes` | PB | List nodes |
 | GET | `/api/mitm/tokens` | PB | List node tokens |
-| POST | `/api/mitm/tokens` | PB | Generate token |
+| POST | `/api/mitm/tokens` | PB | Generate token (crypto/rand base62) |
 | DELETE | `/api/mitm/tokens/{id}` | PB | Revoke token |
-| POST | `/mcp` | Bearer | MCP Streamable HTTP |
+| GET | `/api/mitm/queries` | PB | List saved queries |
+| POST | `/api/mitm/queries` | PB | Create saved query |
+| DELETE | `/api/mitm/queries/{id}` | PB | Delete query |
+| GET | `/api/mitm/queries/{id}/run` | PB | Run query, return matching flows |
+| GET | `/api/mitm/alerts` | PB | List recent alerts (100 most recent) |
+| POST | `/mcp` | Bearer | MCP Streamable HTTP (JSON-RPC 2.0) |
+| GET | `/dashboard/{path...}` | — | Svelte dashboard (login page if unauthed) |
 
 PB auth = PocketBase superuser token via `Authorization: Bearer <token>`.
+X-Token = node token from `node_tokens` collection via `X-Token` header.
 
 ## Layout
 
@@ -158,25 +192,36 @@ PB auth = PocketBase superuser token via `Authorization: Bearer <token>`.
 │   ├── hub.go                   # Routes, middleware, WS manager
 │   ├── ws.go                    # WS keepalive, broadcasting
 │   ├── agent_connect.go         # WS upgrade + auth handshake
-│   ├── flows.go                 # Flow ingest, list, detail
-│   ├── rules.go                 # Rule CRUD, reorder, hooks
+│   ├── flows.go                 # Flow ingest, list, detail, pagination
+│   ├── rules.go                 # Rule CRUD, reorder, dry-run, hooks
 │   ├── tokens.go                # Token management
+│   ├── alerts.go                # Alert ring buffer, webhook, WS push
+│   ├── export.go                # cURL & HAR export endpoints
+│   ├── stats.go                 # Dashboard stats aggregation
+│   ├── queries.go               # Saved query CRUD + run
+│   ├── retention.go             # Flow TTL cleanup
 │   ├── mcp.go                   # MCP server (9 tools)
 │   ├── dashboard.go             # Svelte SPA handler
 │   ├── migrations/              # PB collection definitions
+│   ├── hub_test.go              # Integration tests
 │   └── site/                    # Svelte 5 dashboard source
 ├── agent/
 │   ├── mitm_agent.py            # Agent entrypoint
 │   ├── ws_client.py             # Hub WS client
 │   ├── local_store.py           # SQLite local persistence
-│   ├── pb_client.py             # PocketBase REST wrapper
 │   ├── addons/
 │   │   ├── rule_engine.py       # 9 rule actions + glob matching
 │   │   └── flow_capture.py      # Async batch upload from SQLite
 │   └── tests/
 ├── compose.yaml                 # Hub + agent Docker
-├── Dockerfile.hub               # Multi-stage (node → go → alpine)
+├── Dockerfile.hub               # Multi-stage hub build
+├── Dockerfile.single            # Single container (hub + agent)
 ├── agent/Dockerfile.agent       # Python slim
+├── supervisord.conf             # Supervisor config for single container
+├── .github/workflows/
+│   ├── test.yml                 # CI: Go + Python tests, lint
+│   └── release.yml              # CD: buildx multi-arch push to ghcr.io
+├── Makefile                     # Build/push targets
 ├── flake.nix                    # Nix dev shell
 ├── AGENTS.md                    # AI coding agent context
 └── PLAN.md                      # Build roadmap
@@ -187,7 +232,7 @@ PB auth = PocketBase superuser token via `Authorization: Bearer <token>`.
 | Collection | Fields |
 |------------|--------|
 | `nodes` | label, token, fingerprint, status (up/down), address, version, last_seen |
-| `rules` | node (\* = all), priority, action, match (JSON), spec (JSON), enabled |
+| `rules` | node (* = all), priority, action, match (JSON), spec (JSON), enabled |
 | `flows` | node, captured_at, method, host, path, status_code, req_size, resp_size, duration_ms, tags, req_headers, resp_headers |
 | `flow_bodies` | flow (relation), direction (req/resp), body (text), size |
 | `queries` | name, filter (JSON DSL), node, owner |
@@ -206,12 +251,48 @@ cd agent && python -m pytest
 go test ./...
 ```
 
-## Deploy
+## Deploy options
+
+### Docker compose (recommended for dev)
 
 ```sh
-AGENT_TOKEN=<token> docker compose up
-# Hub :8090, agent proxy :8082
+AGENT_TOKEN=test-agent-token docker compose up -d
 ```
 
-The agent uses `network_mode: host` in compose for DNS resolution.
-mitmproxy listens on `:8082` (port 8080 reserved by OrbStack).
+Hub on `:8090`, agent proxy on `:8082`.
+
+### Single container (for production / easy deploy)
+
+```sh
+docker build -t ghcr.io/weeebdev/mitmix -f Dockerfile.single .
+docker run -p 8090:8090 -p 8082:8082 \
+  -e AGENT_TOKEN=my-token \
+  -e HUB_ADMIN_PASSWORD=strongpass \
+  ghcr.io/weeebdev/mitmix
+```
+
+### GitHub Container Registry (CI)
+
+Tagged releases are published to `ghcr.io/weeebdev/mitmix` via GitHub Actions.
+Multi-arch: `linux/amd64`, `linux/arm64`.
+
+```sh
+docker pull ghcr.io/weeebdev/mitmix:v0.1.0
+```
+
+## CI/CD
+
+| Workflow | Trigger | What it does |
+|----------|---------|-------------|
+| `test.yml` | Push/PR to main | `go test ./...`, `python -m pytest`, `ruff check` |
+| `release.yml` | Tag `v*` | Buildx multi-arch push to `ghcr.io/weeebdev/mitmix{,-hub,-agent}` |
+
+## Env vars
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HUB_ADMIN_EMAIL` | `admin@mitmix.local` | Admin email for auto-provision |
+| `HUB_ADMIN_PASSWORD` | `mitmixadmin123` | Admin password |
+| `FLOW_RETENTION_HOURS` | `24` | Flow TTL in hours |
+| `ALERT_WEBHOOK_URL` | — | POST alert JSON to this URL |
+| `AGENT_TOKEN` | — | Token for agent to authenticate with hub |

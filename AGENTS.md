@@ -27,7 +27,7 @@ hub, pull rules, apply them to live traffic, and stream captured flows back.
 - Rule matching runs in the agent; hub is source of truth + realtime distributor.
 - All persistent state in PocketBase collections (nodes, rules, flows,
   flow_bodies, queries, node_tokens).
-- Agent uses `network_mode: host` in compose (bridge mode broke external DNS).
+- Agent uses port-mapped bridge network in compose (agent connects via `ws://hub:8090`).
 - NO comments unless asked.
 
 ## Build / run
