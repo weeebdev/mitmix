@@ -20,7 +20,7 @@
   <Login />
 {:else}
   <nav>
-    <h1>mitm-decentralized</h1>
+    <h1>mitmix</h1>
     <button class={tab === 'nodes' ? 'active' : ''} onclick={() => tab = 'nodes'}>Nodes</button>
     <button class={tab === 'rules' ? 'active' : ''} onclick={() => tab = 'rules'}>Rules</button>
     <button class={tab === 'flows' ? 'active' : ''} onclick={() => tab = 'flows'}>Flows</button>

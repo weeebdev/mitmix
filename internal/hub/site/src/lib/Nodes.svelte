@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { listNodes, connectLive } from '../api'
+  import { listNodes, connectLive, fmtDate } from '../api'
   import type { Node } from '../api'
   import NodeDetail from './NodeDetail.svelte'
 
@@ -8,6 +8,26 @@
   let error = $state('')
   let selectedNode = $state<Node | null>(null)
   let cleanup: (() => void) | null = null
+  let sortKey = $state<string>('name')
+  let sortDir = $state<-1 | 1>(1)
+
+  function toggleSort(key: string) {
+    if (sortKey === key) { sortDir = sortDir === 1 ? -1 : 1 }
+    else { sortKey = key; sortDir = 1 }
+  }
+
+  function sortIcon(key: string): string {
+    if (sortKey !== key) return '↕'
+    return sortDir === 1 ? '↑' : '↓'
+  }
+
+  let sorted = $derived([...nodes].sort((a: any, b: any) => {
+    let av = a[sortKey], bv = b[sortKey]
+    if (typeof av === 'string') { av = av.toLowerCase(); bv = (bv || '').toLowerCase() }
+    if (av < bv) return -1 * sortDir
+    if (av > bv) return 1 * sortDir
+    return 0
+  }))
 
   async function load() {
     try { nodes = await listNodes() }
@@ -28,13 +48,19 @@
 <div class="card"><h3>Connected Nodes</h3><div class="val">{nodes.length}</div></div>
 
 <table>
-  <thead><tr><th>Name</th><th>Token</th><th>Fingerprint</th><th>Status</th><th>Version</th></tr></thead>
+  <thead><tr>
+    <th onclick={() => toggleSort('name')} class="sort">{sortIcon('name')} Name</th>
+    <th onclick={() => toggleSort('last_seen')} class="sort">{sortIcon('last_seen')} Last Seen</th>
+    <th onclick={() => toggleSort('fingerprint')} class="sort">{sortIcon('fingerprint')} Fingerprint</th>
+    <th onclick={() => toggleSort('status')} class="sort">{sortIcon('status')} Status</th>
+    <th onclick={() => toggleSort('version')} class="sort">{sortIcon('version')} Version</th>
+  </tr></thead>
   <tbody>
     {#if nodes.length}
-      {#each nodes as n}
+      {#each sorted as n}
         <tr class="row" onclick={() => selectedNode = n} role="button" tabindex="0">
           <td>{n.name || n.id}</td>
-          <td>{n.token?.slice(0, 8)}…</td>
+          <td>{n.last_seen ? fmtDate(n.last_seen) : '-'}</td>
           <td>{n.fingerprint || '-'}</td>
           <td class="status-{n.status}">{n.status || 'down'}</td>
           <td>{n.version || '-'}</td>

@@ -1,3 +1,5 @@
+name: mitmix
+
 services:
   hub:
     build:

@@ -1,7 +1,7 @@
 # ============================================================
 # Stage 1: build hub (Go binary)
 # ============================================================
-FROM golang:1.22-alpine AS hub-builder
+FROM golang:latest AS hub-builder
 RUN apk add --no-cache gcc musl-dev
 WORKDIR /build
 COPY go.mod go.sum ./

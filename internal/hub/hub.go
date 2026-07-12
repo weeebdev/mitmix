@@ -43,7 +43,7 @@ func (h *Hub) Start() error {
 		h.registerMiddlewares(se)
 		h.registerRoutes(se)
 		h.startRetention()
-		log.Println("mitm-decentralized hub started")
+		log.Println("mitmix hub started")
 		return se.Next()
 	})
 

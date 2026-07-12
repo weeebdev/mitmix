@@ -10,6 +10,8 @@
   let newFlowIds = $state<Set<string>>(new Set())
   let interval: number
   let cleanup: (() => void) | null = null
+  let sortKey = $state<string>('captured_at')
+  let sortDir = $state<-1 | 1>(-1)
 
   let method = $state('')
   let host = $state('')
@@ -43,6 +45,25 @@
     filterMethod = ''; filterHost = ''; filterStatus = ''
     load()
   }
+
+  function toggleSort(key: string) {
+    if (sortKey === key) { sortDir = sortDir === 1 ? -1 : 1 }
+    else { sortKey = key; sortDir = -1 }
+  }
+
+  function sortIcon(key: string): string {
+    if (sortKey !== key) return '↕'
+    return sortDir === 1 ? '↑' : '↓'
+  }
+
+  let sorted = $derived([...flows].sort((a: any, b: any) => {
+    let av = a[sortKey], bv = b[sortKey]
+    if (typeof av === 'string') av = av.toLowerCase()
+    if (typeof bv === 'string') bv = bv.toLowerCase()
+    if (av < bv) return -1 * sortDir
+    if (av > bv) return 1 * sortDir
+    return 0
+  }))
 
   onMount(() => {
     load()
@@ -80,10 +101,17 @@
 <div class="flows-layout">
   <div class="flows-table">
     <table>
-      <thead><tr><th>Time</th><th>Method</th><th>Host</th><th>Path</th><th>Status</th><th>Duration</th></tr></thead>
+      <thead><tr>
+        <th onclick={() => toggleSort('captured_at')} class="sort">{sortIcon('captured_at')} Time</th>
+        <th onclick={() => toggleSort('method')} class="sort">{sortIcon('method')} Method</th>
+        <th onclick={() => toggleSort('host')} class="sort">{sortIcon('host')} Host</th>
+        <th onclick={() => toggleSort('path')} class="sort">{sortIcon('path')} Path</th>
+        <th onclick={() => toggleSort('status_code')} class="sort">{sortIcon('status_code')} Status</th>
+        <th onclick={() => toggleSort('duration_ms')} class="sort">{sortIcon('duration_ms')} Dur</th>
+      </tr></thead>
       <tbody>
         {#if flows.length}
-          {#each flows as f}
+          {#each sorted as f}
             <tr class:selected={selected?.id === f.id} class:newflow={newFlowIds.has(f.id)} onclick={() => selected = f}>
               <td>{fmtTime(f.captured_at)}</td>
               <td>{f.method}</td><td>{f.host}</td><td>{f.path}</td>
@@ -120,6 +148,8 @@
   tr.newflow { animation: flash 2s ease-out; }
   @keyframes flash { 0% { background: #1c3d2e; } 100% { background: transparent; } }
   .empty { color: #8b949e; text-align: center; padding: 24px; }
+  .sort { cursor: pointer; user-select: none; }
+  .sort:hover { color: #c9d1d9; }
   .filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
   .filter-bar select, .filter-bar input { padding: 4px 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px; }
   .filter-bar button { padding: 4px 12px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 4px; cursor: pointer; font-size: 13px; }
