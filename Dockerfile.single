@@ -2,7 +2,6 @@
 # Stage 1: build hub (Go binary)
 # ============================================================
 FROM golang:latest AS hub-builder
-RUN apk add --no-cache gcc musl-dev
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
