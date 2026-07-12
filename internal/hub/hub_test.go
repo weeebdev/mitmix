@@ -3,6 +3,7 @@ package hub
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
@@ -194,7 +195,7 @@ func TestRetentionRuns(t *testing.T) {
 
 	newRec := core.NewRecord(col)
 	newRec.Set("node", "new-agent")
-	newRec.Set("captured_at", "2026-07-11T00:00:00Z")
+	newRec.Set("captured_at", time.Now().UTC().Format(time.RFC3339))
 	newRec.Set("method", "POST")
 	newRec.Set("host", "new.example.com")
 	newRec.Set("path", "/new")
