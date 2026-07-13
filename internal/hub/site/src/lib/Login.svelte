@@ -1,8 +1,8 @@
 <script lang="ts">
   import { login } from '../api'
 
-  let identity = $state('admin@mitm.local')
-  let password = $state('mitmadmin123')
+  let identity = $state('')
+  let password = $state('')
   let error = $state('')
   let loading = $state(false)
 
@@ -23,7 +23,7 @@
     <h1>mitmix</h1>
     <p class="sub">Sign in to your account</p>
     {#if error}<div class="error">{error}</div>{/if}
-    <label>Email <input type="text" bind:value={identity} placeholder="admin@mitm.local" /></label>
+    <label>Email <input type="text" bind:value={identity} placeholder="email" /></label>
     <label>Password <input type="password" bind:value={password} /></label>
     <button type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Sign In'}</button>
   </form>

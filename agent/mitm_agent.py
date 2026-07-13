@@ -21,7 +21,9 @@ class AgentAddon:
         self.local_store = LocalStore()
         self.rule_engine = RuleEngine(self.local_store.load_rules())
         rest_url = hub_url.replace("ws://", "http://").replace("wss://", "https://")
-        self.flow_capture = FlowCapture(hub_url=rest_url, token=token, local_store=self.local_store)
+        self.flow_capture = FlowCapture(
+            hub_url=rest_url, token=token, local_store=self.local_store
+        )
         self.ws_client = HubWebSocketClient(
             hub_url=hub_url,
             token=token,
@@ -34,9 +36,12 @@ class AgentAddon:
         self.ignore_hosts = ignore_hosts or []
 
     def request(self, flow):
-        if self._should_skip(flow):
-            return
-        self.rule_engine.request(flow)
+        try:
+            if self._should_skip(flow):
+                return
+            self.rule_engine.request(flow)
+        except Exception as e:
+            logger.error("request hook error: %s", e, exc_info=True)
 
     def response(self, flow):
         if self._should_skip(flow):
@@ -47,28 +52,55 @@ class AgentAddon:
             if flow.request.scheme and flow.request.port:
                 host = f"{host}:{flow.request.port}"
             req_headers = dict(flow.request.headers) if flow.request.headers else {}
-            resp_headers = dict(flow.response.headers) if flow.response and flow.response.headers else {}
-            req_body = (flow.request.content or b"")[:102400].decode("utf-8", errors="replace")
-            resp_body = (flow.response.content or b"")[:102400].decode("utf-8", errors="replace") if flow.response else ""
+            resp_headers = (
+                dict(flow.response.headers)
+                if flow.response and flow.response.headers
+                else {}
+            )
+            req_body = (flow.request.content or b"")[:102400].decode(
+                "utf-8", errors="replace"
+            )
+            resp_body = (
+                (flow.response.content or b"")[:102400].decode(
+                    "utf-8", errors="replace"
+                )
+                if flow.response
+                else ""
+            )
             record = {
-                "node": f"{flow.server_conn.peername[0]}" if flow.server_conn.peername else "",
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(flow.request.timestamp_start)),
+                "node": f"{flow.server_conn.peername[0]}"
+                if flow.server_conn.peername
+                else "",
+                "timestamp": time.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime(flow.request.timestamp_start)
+                ),
                 "method": flow.request.method or "",
                 "host": host,
                 "path": flow.request.path or "",
                 "status_code": flow.response.status_code if flow.response else 0,
                 "req_content_type": flow.request.headers.get("Content-Type", ""),
-                "resp_content_type": flow.response.headers.get("Content-Type", "") if flow.response else "",
+                "resp_content_type": flow.response.headers.get("Content-Type", "")
+                if flow.response
+                else "",
                 "req_headers": req_headers,
                 "resp_headers": resp_headers,
                 "req_body": req_body,
                 "resp_body": resp_body,
                 "req_size": len(flow.request.content or b""),
                 "resp_size": len(flow.response.content or b"") if flow.response else 0,
-                "duration_ms": int((flow.response.timestamp_end - flow.request.timestamp_start) * 1000) if flow.response else 0,
-                "tags": list(flow.tags) if hasattr(flow, 'tags') else [],
+                "duration_ms": int(
+                    (flow.response.timestamp_end - flow.request.timestamp_start) * 1000
+                )
+                if flow.response
+                else 0,
+                "tags": list(flow.tags) if hasattr(flow, "tags") else [],
             }
-            logger.debug("captured %s %s -> %s", record["method"], record["host"], record["status_code"])
+            logger.debug(
+                "captured %s %s -> %s",
+                record["method"],
+                record["host"],
+                record["status_code"],
+            )
             self.flow_capture.enqueue(record)
         except Exception as e:
             logger.warning("capture error: %s", e)
@@ -91,6 +123,7 @@ class AgentAddon:
     def start_ws(self):
         def run_ws():
             asyncio.run(self.ws_client.run())
+
         self._ws_thread = threading.Thread(target=run_ws, daemon=True)
         self._ws_thread.start()
 
@@ -102,6 +135,7 @@ def _host_match(pattern, host):
     if pattern == "*" or pattern == "":
         return True
     import fnmatch
+
     if fnmatch.fnmatch(host, pattern):
         return True
     if pattern.startswith("*."):
@@ -111,15 +145,31 @@ def _host_match(pattern, host):
 
 def main():
     parser = argparse.ArgumentParser(description="mitmix agent")
-    parser.add_argument("--hub", required=True, help="Hub WebSocket URL (ws://host:8090)")
+    parser.add_argument(
+        "--hub", required=True, help="Hub WebSocket URL (ws://host:8090)"
+    )
     parser.add_argument("--token", required=True, help="Node registration token")
-    parser.add_argument("--listen", default="0.0.0.0:8082", help="mitmproxy listen addr")
-    parser.add_argument("--allow-hosts", default="", help="Comma-sep host globs to proxy (empty=all)")
-    parser.add_argument("--ignore-hosts", default="", help="Comma-sep host globs to skip")
+    parser.add_argument(
+        "--listen", default="0.0.0.0:8082", help="mitmproxy listen addr"
+    )
+    parser.add_argument(
+        "--allow-hosts", default="", help="Comma-sep host globs to proxy (empty=all)"
+    )
+    parser.add_argument(
+        "--ignore-hosts", default="", help="Comma-sep host globs to skip"
+    )
     args = parser.parse_args()
 
-    allow_hosts = [h.strip() for h in args.allow_hosts.split(",") if h.strip()] if args.allow_hosts else []
-    ignore_hosts = [h.strip() for h in args.ignore_hosts.split(",") if h.strip()] if args.ignore_hosts else []
+    allow_hosts = (
+        [h.strip() for h in args.allow_hosts.split(",") if h.strip()]
+        if args.allow_hosts
+        else []
+    )
+    ignore_hosts = (
+        [h.strip() for h in args.ignore_hosts.split(",") if h.strip()]
+        if args.ignore_hosts
+        else []
+    )
 
     opts = options.Options(
         listen_host=args.listen.split(":")[0],
@@ -134,7 +184,12 @@ def main():
         logger.info("ignoring hosts: %s", ignore_hosts)
 
     async def run():
-        agent = AgentAddon(hub_url=args.hub, token=args.token, allow_hosts=allow_hosts, ignore_hosts=ignore_hosts)
+        agent = AgentAddon(
+            hub_url=args.hub,
+            token=args.token,
+            allow_hosts=allow_hosts,
+            ignore_hosts=ignore_hosts,
+        )
         master = dump.DumpMaster(opts, loop=asyncio.get_running_loop())
         master.addons.add(agent)
         agent.flow_capture.start()

@@ -7,13 +7,20 @@
   import Flows from './lib/Flows.svelte'
   import Tokens from './lib/Tokens.svelte'
   import Queries from './lib/Queries.svelte'
+  import Stats from './lib/Stats.svelte'
 
   let authed = $state(false)
   let tab = $state('nodes')
+  let flowFilters = $state<{ host?: string; method?: string; status?: string }>({})
 
   onMount(() => { authed = isAuthed() })
 
   function doLogout() { logout(); authed = false }
+
+  function onNavigate(nav: { tab: string; params?: Record<string, string> }) {
+    tab = nav.tab
+    if (nav.params) flowFilters = nav.params
+  }
 </script>
 
 {#if !authed}
@@ -24,6 +31,7 @@
     <button class={tab === 'nodes' ? 'active' : ''} onclick={() => tab = 'nodes'}>Nodes</button>
     <button class={tab === 'rules' ? 'active' : ''} onclick={() => tab = 'rules'}>Rules</button>
     <button class={tab === 'flows' ? 'active' : ''} onclick={() => tab = 'flows'}>Flows</button>
+    <button class={tab === 'stats' ? 'active' : ''} onclick={() => tab = 'stats'}>Stats</button>
     <button class={tab === 'queries' ? 'active' : ''} onclick={() => tab = 'queries'}>Queries</button>
     <button class={tab === 'tokens' ? 'active' : ''} onclick={() => tab = 'tokens'}>Tokens</button>
     <span class="spacer"></span>
@@ -36,7 +44,9 @@
     {:else if tab === 'rules'}
       <Rules />
     {:else if tab === 'flows'}
-      <Flows />
+      <Flows {flowFilters} />
+    {:else if tab === 'stats'}
+      <Stats {onNavigate} />
     {:else if tab === 'queries'}
       <Queries />
     {:else if tab === 'tokens'}

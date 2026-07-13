@@ -10,6 +10,11 @@ services:
       - "8090:8090"
     volumes:
       - pb_data:/pb_data
+    environment:
+      - FLOW_RETENTION_HOURS=${FLOW_RETENTION_HOURS:-24}
+      - HUB_TLS_CERT=${HUB_TLS_CERT:-}
+      - HUB_TLS_KEY=${HUB_TLS_KEY:-}
+      - HUB_HTTPS=${HUB_HTTPS:-}
 
   agent:
     build:

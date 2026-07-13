@@ -4,6 +4,8 @@
   import type { Flow } from '../api'
   import FlowDetail from './FlowDetail.svelte'
 
+  let { flowFilters = {} }: { flowFilters?: { host?: string; method?: string; status?: string } } = $props()
+
   let flows = $state<Flow[]>([])
   let selected = $state<Flow | null>(null)
   let error = $state('')
@@ -66,6 +68,9 @@
   }))
 
   onMount(() => {
+    if (flowFilters.method) { method = flowFilters.method; filterMethod = flowFilters.method }
+    if (flowFilters.host) { host = flowFilters.host; filterHost = flowFilters.host }
+    if (flowFilters.status) { status = flowFilters.status; filterStatus = flowFilters.status }
     load()
     interval = setInterval(load, 5000)
     cleanup = connectLive((msg) => {

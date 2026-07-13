@@ -62,6 +62,7 @@ Then rebuild Go binary. Assets embedded via `//go:embed`.
 | POST | `/api/mitm/flows` | X-Token | Batch flow ingest (+ body capture) |
 | GET | `/api/mitm/flows` | PB | List flows (?host=, ?method=, ?status=) |
 | GET | `/api/mitm/flows/{id}` | PB | Flow detail with bodies |
+| GET | `/api/mitm/stats` | PB | Aggregated flow stats (counts, durations, status codes, methods, hourly) |
 | GET | `/api/mitm/rules` | PB | List rules |
 | POST | `/api/mitm/rules` | PB | Create rule (live push to agents) |
 | PUT | `/api/mitm/rules/{id}` | PB | Update rule |
@@ -82,6 +83,17 @@ priority-sorted evaluation.
 Agent extracts request/response headers + body (truncated at 100KB) in
 `response()` hook. Bodies stored in `flow_bodies` collection. Dashboard shows
 headers + body content in tabs.
+
+## Git operations
+- **Rebasing across branches:** Always compare local branch against upstream tracking branch
+  (`git log --oneline upstream/<branch>..<branch>`) to verify no commits were dropped.
+  Rebase can silently skip commits via conflict resolution (rerere) — always diff the tree
+  afterward against the source branch.
+- **Cherry-pick vs rebase:** When combining branches with divergent histories (e.g., feature
+  branch vs rebrand branch), cherry-pick the smaller set of commits onto the larger feature
+  branch. This avoids the "empty commit" problem where rerere resolves conflicts in favor
+  of HEAD and discards incoming changes.
+- Use `git worktree` for any file edits per global AGENTS.md.
 
 ## Status
 Phase 1 (hub skeleton) + Phase 2 (agent skeleton) + Phase 3 (auth+rule sync) +

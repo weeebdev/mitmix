@@ -64,15 +64,27 @@ async function api<T>(method: string, path: string, body?: unknown): Promise<T> 
   return r.json()
 }
 
+const LOGIN_COLLECTIONS = ['_superusers', 'users']
+
 export async function login(identity: string, password: string): Promise<void> {
-  const r = await fetch('/api/collections/_superusers/auth-with-password', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identity, password }),
-  })
-  if (!r.ok) throw new Error('login failed')
-  const data = await r.json()
-  setToken(data.token)
+  let lastErr = ''
+  for (const col of LOGIN_COLLECTIONS) {
+    try {
+      const r = await fetch(`/api/collections/${col}/auth-with-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identity, password }),
+      })
+      if (r.ok) {
+        const data = await r.json()
+        setToken(data.token)
+        return
+      }
+      const errData = await r.json().catch(() => ({}))
+      lastErr = errData?.message || r.statusText || 'login failed'
+    } catch { lastErr = 'connection error' }
+  }
+  throw new Error(lastErr)
 }
 
 export function logout() { clearToken() }
@@ -127,10 +139,25 @@ export function listTokens() { return api<Token[]>('GET', '/tokens') }
 export function generateToken(label: string) { return api<Token>('POST', '/tokens', { label }) }
 export function deleteToken(id: string) { return api<{deleted: string}>('DELETE', '/tokens/' + id) }
 
+export function getStats() { return api<Stats>('GET', '/stats') }
+
 export function listQueries() { return api<Query[]>('GET', '/queries') }
 export function createQuery(name: string, filter: string) { return api<Query>('POST', '/queries', { name, filter }) }
 export function deleteQuery(id: string) { return api<{deleted: string}>('DELETE', '/queries/' + id) }
 export function runQuery(id: string) { return api<Flow[]>('GET', '/queries/' + id + '/run') }
+
+interface Stats {
+  total_flows: number
+  duration_avg: number
+  duration_max: number
+  total_req_size: number
+  total_resp_size: number
+  status_codes: Record<string, number>
+  methods: Record<string, number>
+  top_hosts: { host: string; count: number }[]
+  hourly: { hour: string; count: number }[]
+  success_rate: number
+}
 
 interface Query {
   id: string
@@ -154,4 +181,4 @@ export function connectLive(cb: (msg: any) => void): () => void {
   return () => ws.close()
 }
 
-export type { Flow, FlowDetail, Rule, Node, Token, Query }
+export type { Flow, FlowDetail, Rule, Node, Token, Query, Stats }
