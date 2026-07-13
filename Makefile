@@ -10,15 +10,15 @@ proxy-on: check-agent
 		echo "Agent already running (PID $$(cat $(PIDFILE)))"; \
 	else \
 		echo "Starting mitmix agent..."; \
-		nohup $(VENV)/bin/python $(VENV)/mitm_agent.py --hub $(HUB_URL) --token $(TOKEN) > /tmp/mitmix-agent.log 2>&1 & \
+		nohup $(VENV)/bin/python agent/mitm_agent.py --hub $(HUB_URL) --token $(TOKEN) > /tmp/mitmix-agent.log 2>&1 & \
 		echo $$! > $(PIDFILE); \
 		sleep 2; \
-		if kill -0 $$(cat $(PIDFILE)) 2>/dev/null; then \
-			echo "Agent running (PID $$(cat $(PIDFILE)))"; \
-		else \
-			echo "Agent failed. Check /tmp/mitmix-agent.log"; \
+		if ! kill -0 $$(cat $(PIDFILE)) 2>/dev/null; then \
+			echo "Agent failed to start. Check /tmp/mitmix-agent.log"; \
+			rm -f $(PIDFILE); \
 			exit 1; \
 		fi; \
+		echo "Agent running (PID $$(cat $(PIDFILE)))"; \
 	fi
 	@echo "Setting system proxy..."
 	sudo networksetup -setwebproxy Wi-Fi 127.0.0.1 8082
