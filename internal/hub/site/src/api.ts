@@ -32,6 +32,8 @@ interface Flow {
   req_size: number
   resp_size: number
   captured_at: string
+  app_name?: string
+  source_host?: string
 }
 
 interface Rule {
@@ -125,13 +127,15 @@ export function isAuthed(): boolean { return !!getToken() }
 
 export function listNodes() { return api<Node[]>('GET', '/nodes') }
 export function listRules() { return api<Rule[]>('GET', '/rules') }
-export function listFlows(params?: { host?: string; method?: string; status?: string }) {
+export function listFlows(params?: { host?: string; method?: string; status?: string; app?: string; source?: string }) {
   let q = ''
   if (params) {
     const p: string[] = []
     if (params.host) p.push('host=' + encodeURIComponent(params.host))
     if (params.method) p.push('method=' + encodeURIComponent(params.method))
     if (params.status) p.push('status=' + encodeURIComponent(params.status))
+    if (params.app) p.push('app=' + encodeURIComponent(params.app))
+    if (params.source) p.push('source=' + encodeURIComponent(params.source))
     if (p.length) q = '?' + p.join('&')
   }
   return api<Flow[]>('GET', '/flows' + q)
@@ -159,6 +163,8 @@ interface FlowDetail {
   resp_headers: Record<string, string[]>
   req_body: string
   resp_body: string
+  app_name?: string
+  source_host?: string
 }
 
 interface Token {

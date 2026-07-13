@@ -165,6 +165,21 @@ certutil -addstore Root $env:TEMP\mitmproxy-ca-cert.pem
 **Firefox:** Preferences → Privacy & Security → Certificates → View Certificates →
 Authorities → Import → select the downloaded PEM, check "Trust this CA to identify websites".
 
+## Process Name Resolution
+
+When the agent runs on the same machine as the proxied applications (brew service, pip install),
+it resolves the **application name** from the source port of each proxied connection.
+
+- **macOS**: uses `lsof -i TCP:<port>` to find the process
+- **Linux**: uses `ss -Hp sport = :<port>` to find the process
+- Captured as `app_name` in the flow record, visible in the dashboard
+- Also captures `source_host` (the client IP that made the request)
+- Both fields are **clickable/filterable** in the dashboard
+
+> **Note:** This only works when the agent is on the same machine as the proxied apps
+> (e.g., via Homebrew service or pip install). Docker agents see connections from the
+> Docker bridge gateway and cannot resolve process names.
+
 ## Environment Variables
 
 | Variable | Default | Description |

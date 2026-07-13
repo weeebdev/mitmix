@@ -11,7 +11,7 @@
 
   let authed = $state(false)
   let tab = $state('nodes')
-  let flowFilters = $state<{ host?: string; method?: string; status?: string }>({})
+  let flowFilters = $state<{ host?: string; method?: string; status?: string; app?: string; source?: string }>({})
 
   onMount(() => { authed = isAuthed() })
 
@@ -45,7 +45,7 @@
     {:else if tab === 'rules'}
       <Rules />
     {:else if tab === 'flows'}
-      <Flows {flowFilters} />
+      <Flows {flowFilters} {onNavigate} />
     {:else if tab === 'stats'}
       <Stats {onNavigate} />
     {:else if tab === 'queries'}

@@ -24,6 +24,8 @@ type FlowRecord struct {
 	ReqBody         string            `json:"req_body,omitempty"`
 	RespBody        string            `json:"resp_body,omitempty"`
 	Tags            []string          `json:"tags,omitempty"`
+	AppName         string            `json:"app_name,omitempty"`
+	SourceHost      string            `json:"source_host,omitempty"`
 }
 
 type IngestRequest struct {
@@ -61,6 +63,8 @@ func (h *Hub) handleIngestFlows(e *core.RequestEvent) error {
 		rec.Set("req_size", f.ReqSize)
 		rec.Set("resp_size", f.RespSize)
 		rec.Set("duration_ms", f.DurationMs)
+		rec.Set("app_name", f.AppName)
+		rec.Set("source_host", f.SourceHost)
 		if f.ReqHeaders != nil {
 			hdrJson, _ := json.Marshal(f.ReqHeaders)
 			rec.Set("req_headers", string(hdrJson))
@@ -121,6 +125,8 @@ func (h *Hub) handleGetFlow(e *core.RequestEvent) error {
 		"resp_size":    rec.Get("resp_size"),
 		"duration_ms":  rec.Get("duration_ms"),
 		"tags":         rec.Get("tags"),
+		"app_name":     rec.Get("app_name"),
+		"source_host":  rec.Get("source_host"),
 		"req_body":     reqBody,
 		"resp_body":    respBody,
 	}
@@ -147,6 +153,14 @@ func (h *Hub) handleListFlows(e *core.RequestEvent) error {
 	if status := e.Request.URL.Query().Get("status"); status != "" {
 		filters = append(filters, "status_code = {:status}")
 		params["status"] = status
+	}
+	if app := e.Request.URL.Query().Get("app"); app != "" {
+		filters = append(filters, "app_name = {:app}")
+		params["app"] = app
+	}
+	if source := e.Request.URL.Query().Get("source"); source != "" {
+		filters = append(filters, "source_host ~ {:source}")
+		params["source"] = source
 	}
 
 	filter := "1=1"

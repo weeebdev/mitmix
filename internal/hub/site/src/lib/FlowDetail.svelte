@@ -2,7 +2,11 @@
   import { getFlowDetail, createRule, fmtDate } from '../api'
   import type { FlowDetail, Flow } from '../api'
 
-  let { flow, onclose }: { flow: Flow; onclose: () => void } = $props()
+  let {
+    flow, onclose, onNavigate = (_: any) => {}
+  }: {
+    flow: Flow; onclose: () => void; onNavigate?: (nav: { tab: string; params?: Record<string, string> }) => void
+  } = $props()
 
   let detail = $state<FlowDetail | null>(null)
   let loading = $state(true)
@@ -87,6 +91,18 @@
         <div class="field"><label>Req Size</label><span>{detail.req_size} bytes</span></div>
         <div class="field"><label>Resp Size</label><span>{detail.resp_size} bytes</span></div>
         <div class="field"><label>Captured</label><span>{fmtDate(detail.captured_at)}</span></div>
+        {#if detail.app_name}
+          <div class="field">
+            <label>App</label>
+            <button class="link" onclick={() => onNavigate({ tab: 'flows', params: { app: detail.app_name } })}>{detail.app_name}</button>
+          </div>
+        {/if}
+        {#if detail.source_host}
+          <div class="field">
+            <label>Source</label>
+            <button class="link" onclick={() => onNavigate({ tab: 'flows', params: { source: detail.source_host } })}>{detail.source_host}</button>
+          </div>
+        {/if}
       {:else if tab === 'request'}
         <h4>Headers</h4>
         <div class="headers">
@@ -170,4 +186,6 @@
   .btn-cancel { background: #21262d !important; color: #c9d1d9 !important; border: 1px solid #30363d !important; }
   .btn-cancel:hover { background: #30363d !important; }
   .toast { position: sticky; bottom: 0; padding: 8px 16px; background: #238636; color: #fff; font-size: 12px; text-align: center; }
+  .link { background: none; border: none; color: #58a6ff; cursor: pointer; padding: 0; font: inherit; font-size: 13px; text-decoration: underline; }
+  .link:hover { color: #79c0ff; }
 </style>

@@ -71,12 +71,16 @@ func init() {
       { "name": "req_size", "type": "number", "onlyInt": true },
       { "name": "resp_size", "type": "number", "onlyInt": true },
       { "name": "duration_ms", "type": "number", "onlyInt": true },
-      { "name": "tags", "type": "json" }
+      { "name": "tags", "type": "json" },
+      { "name": "app_name", "type": "text", "max": 255 },
+      { "name": "source_host", "type": "text", "max": 255 }
     ],
     "indexes": [
       "CREATE INDEX idx_flows_node ON flows (node)",
       "CREATE INDEX idx_flows_captured_at ON flows (captured_at)",
-      "CREATE INDEX idx_flows_host ON flows (host)"
+      "CREATE INDEX idx_flows_host ON flows (host)",
+      "CREATE INDEX idx_flows_app_name ON flows (app_name)",
+      "CREATE INDEX idx_flows_source_host ON flows (source_host)"
     ]
   },
   {

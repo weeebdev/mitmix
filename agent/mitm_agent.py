@@ -15,6 +15,7 @@ from addons.rule_engine import RuleEngine
 from addons.flow_capture import FlowCapture
 from ws_client import HubWebSocketClient
 from local_store import LocalStore
+from process_resolver import ProcessResolver
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mitm_agent")
@@ -24,6 +25,7 @@ class AgentAddon:
     def __init__(self, hub_url, token, allow_hosts=None, ignore_hosts=None):
         self.local_store = LocalStore()
         self.rule_engine = RuleEngine(self.local_store.load_rules())
+        self.process_resolver = ProcessResolver()
         rest_url = hub_url.replace("ws://", "http://").replace("wss://", "https://")
         self.flow_capture = FlowCapture(
             hub_url=rest_url, token=token, local_store=self.local_store
@@ -71,7 +73,15 @@ class AgentAddon:
                 if flow.response
                 else ""
             )
+            src_ip = flow.client_conn.peername[0] if flow.client_conn.peername else ""
+            src_port = (
+                flow.client_conn.peername[1] if flow.client_conn.peername else None
+            )
+            app_name = self.process_resolver.resolve(src_ip, src_port)
+
             record = {
+                "app_name": app_name or "",
+                "source_host": src_ip,
                 "node": f"{flow.server_conn.peername[0]}"
                 if flow.server_conn.peername
                 else "",
