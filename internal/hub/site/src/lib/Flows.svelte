@@ -35,14 +35,22 @@
   let filterStatus = $state('')
   let filterApp = $state('')
   let filterSource = $state('')
+  let filterSince = $state('')
+  let timePreset = $state('5m')
 
-  function getFilterParams(): { host?: string; method?: string; status?: string; app?: string; source?: string } {
-    const p: { host?: string; method?: string; status?: string; app?: string; source?: string } = {}
+  function timeSince(preset: string): string {
+    const ms = { '5m': 300000, '30m': 1800000, '1h': 3600000, '6h': 21600000 }[preset] || 0
+    return new Date(Date.now() - ms).toISOString()
+  }
+
+  function getFilterParams(): Record<string, string> {
+    const p: Record<string, string> = {}
     if (filterMethod) p.method = filterMethod
     if (filterHost) p.host = filterHost
     if (filterStatus) p.status = filterStatus
     if (filterApp) p.app = filterApp
     if (filterSource) p.source = filterSource
+    if (filterSince) p.since = filterSince
     return p
   }
 
@@ -84,19 +92,52 @@
     loadRules()
   }
 
+  function setTime(preset: string) {
+    timePreset = preset
+    if (preset === 'all') { filterSince = '' }
+    else { filterSince = timeSince(preset) }
+    load()
+  }
+
   function applyFilters() {
     filterMethod = method
     filterHost = host
     filterStatus = status
     filterApp = app
     filterSource = source
+    filterSince = timeSince(timePreset)
     load()
   }
 
   function clearFilters() {
     method = ''; host = ''; status = ''; app = ''; source = ''
     filterMethod = ''; filterHost = ''; filterStatus = ''; filterApp = ''; filterSource = ''
+    filterSince = ''
     load()
+  }
+
+  function exportJSON() {
+    const blob = new Blob([JSON.stringify(flows, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'flows.json'; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function exportHAR() {
+    const entries = flows.map(f => ({
+      startedDateTime: f.captured_at,
+      time: f.duration_ms,
+      request: { method: f.method, url: 'https://' + f.host + f.path, headersSize: -1, bodySize: f.req_size },
+      response: { status: f.status_code, statusText: '', headersSize: -1, bodySize: f.resp_size },
+      cache: {}, timings: { send: -1, wait: -1, receive: f.duration_ms },
+    }))
+    const har = { log: { version: '1.2', creator: { name: 'mitmix', version: '0.1' }, entries } }
+    const blob = new Blob([JSON.stringify(har, null, 2)], { type: 'application/har+json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'flows.har'; a.click()
+    URL.revokeObjectURL(url)
   }
 
   function toggleSort(key: string) {
@@ -124,6 +165,7 @@
     if (flowFilters.status) { status = flowFilters.status; filterStatus = flowFilters.status }
     if (flowFilters.app) { app = flowFilters.app; filterApp = flowFilters.app }
     if (flowFilters.source) { source = flowFilters.source; filterSource = flowFilters.source }
+    filterSince = timeSince('5m')
     load()
     getStats().then(s => { topApps = (s.top_apps || []).map(a => a.app) }).catch(() => {})
     loadRules()
@@ -161,8 +203,15 @@
     {/each}
   </datalist>
   <input type="text" placeholder="Source Host" bind:value={source} />
+  <div class="time-group">
+    {#each [['5m','5m'], ['30m','30m'], ['1h','1h'], ['6h','6h'], ['all','All']] as [val, lbl]}
+      <button class:active={timePreset === val} onclick={() => setTime(val)}>{lbl}</button>
+    {/each}
+  </div>
   <button onclick={applyFilters}>Apply</button>
   <button class="clear" onclick={clearFilters}>Clear</button>
+  <button class="export" onclick={exportJSON}>JSON</button>
+  <button class="export" onclick={exportHAR}>HAR</button>
 </div>
 
 <div class="flows-layout">
@@ -248,6 +297,10 @@
   .filter-bar button { padding: 4px 12px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 4px; cursor: pointer; font-size: 13px; }
   .filter-bar button:hover { background: #30363d; }
   .filter-bar button.clear { color: #8b949e; }
+  .filter-bar button.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  .filter-bar button.export { color: #58a6ff; font-size: 11px; padding: 4px 8px; }
+  .time-group { display: flex; gap: 2px; }
+  .time-group button { font-size: 11px; padding: 4px 6px; }
   .link { background: none; border: none; color: #58a6ff; cursor: pointer; padding: 0; font: inherit; text-decoration: underline; }
   .link:hover { color: #79c0ff; }
   .actions { white-space: nowrap; display: flex; gap: 2px; }

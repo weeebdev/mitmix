@@ -162,6 +162,14 @@ func (h *Hub) handleListFlows(e *core.RequestEvent) error {
 		filters = append(filters, "source_host ~ {:source}")
 		params["source"] = source
 	}
+	if since := e.Request.URL.Query().Get("since"); since != "" {
+		filters = append(filters, "captured_at >= {:since}")
+		params["since"] = since
+	}
+	if until := e.Request.URL.Query().Get("until"); until != "" {
+		filters = append(filters, "captured_at <= {:until}")
+		params["until"] = until
+	}
 
 	filter := "1=1"
 	if len(filters) > 0 {
