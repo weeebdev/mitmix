@@ -21,6 +21,11 @@
   let interceptRules = $state<Map<string, string>>(new Map())
   let rulesLoaded = $state(false)
   let interval: number
+  let panelX = $state(0)
+  let panelY = $state(0)
+  let dragging = $state(false)
+  let dragOffX = $state(0)
+  let dragOffY = $state(0)
   let cleanup: (() => void) | null = null
   let sortKey = $state<string>('captured_at')
   let sortDir = $state<-1 | 1>(-1)
@@ -268,8 +273,21 @@
   </div>
 
   {#if selected}
-    <div class="detail-panel">
-      <FlowDetail flow={selected} onclose={() => selected = null} {onNavigate} />
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="detail-panel"
+      style="left: {panelX}px; top: {panelY}px;"
+      role="dialog"
+      onmousedown={(e) => {
+        const t = e.target as HTMLElement
+        if (!t.closest('.panel-header') && !t.closest('.close')) return
+        dragging = true; dragOffX = e.clientX - panelX; dragOffY = e.clientY - panelY
+      }}
+      onmousemove={(e) => { if (dragging) { panelX = e.clientX - dragOffX; panelY = e.clientY - dragOffY } }}
+      onmouseup={() => dragging = false}
+      onmouseleave={() => dragging = false}
+    >
+      <FlowDetail flow={selected} onclose={() => { selected = null; panelX = 0; panelY = 0 }} {onNavigate} />
     </div>
   {/if}
 </div>
@@ -280,7 +298,7 @@
   .card .val { font-size: 28px; font-weight: 700; }
   .flows-layout { display: flex; gap: 16px; align-items: flex-start; }
   .flows-table { flex: 1; min-width: 0; }
-  .detail-panel { position: sticky; top: 16px; align-self: flex-start; max-height: calc(100vh - 120px); overflow-y: auto; }
+  .detail-panel { position: fixed; top: 80px; right: 16px; z-index: 100; width: 500px; max-height: calc(100vh - 100px); overflow-y: auto; cursor: default; }
   table { width: 100%; border-collapse: collapse; }
   th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #21262d; font-size: 13px; }
   th { color: #8b949e; font-weight: 600; }
