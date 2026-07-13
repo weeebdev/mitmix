@@ -251,6 +251,74 @@ def _host_match(pattern, host):
     return False
 
 
+def _proxy_command(action):
+    if sys.platform != "darwin":
+        print("Proxy toggle only supported on macOS")
+        sys.exit(1)
+    svc = _get_network_service()
+    if action == "on":
+        subprocess.run(
+            ["networksetup", "-setwebproxy", svc, "127.0.0.1", "8082"], check=False
+        )
+        subprocess.run(
+            ["networksetup", "-setsecurewebproxy", svc, "127.0.0.1", "8082"],
+            check=False,
+        )
+        print("System proxy ON → 127.0.0.1:8082")
+    elif action == "off":
+        subprocess.run(["networksetup", "-setwebproxystate", svc, "off"], check=False)
+        subprocess.run(
+            ["networksetup", "-setsecurewebproxystate", svc, "off"], check=False
+        )
+        print("System proxy OFF")
+    elif action == "status":
+        r = subprocess.run(
+            ["networksetup", "-getwebproxy", svc],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        s = subprocess.run(
+            ["networksetup", "-getsecurewebproxy", svc],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        def is_enabled(out):
+            for line in out.splitlines():
+                if line.strip().startswith("Enabled:"):
+                    return "Yes" in line
+            return False
+
+        http_on = is_enabled(r.stdout)
+        https_on = is_enabled(s.stdout)
+        if http_on or https_on:
+            print(
+                "Proxy: ON (http=%s https=%s)"
+                % ("yes" if http_on else "no", "yes" if https_on else "no")
+            )
+        else:
+            print("Proxy: OFF")
+    else:
+        print("Usage: mitmix-agent proxy on|off|status")
+        sys.exit(1)
+
+
+def _get_network_service():
+    r = subprocess.run(
+        ["networksetup", "-listallnetworkservices"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    for line in r.stdout.splitlines():
+        line = line.strip()
+        if line and not line.startswith("An asterisk"):
+            return line
+    return "Wi-Fi"
+
+
 ENV_MAP = {
     "hub": "MITMIX_HUB",
     "token": "MITMIX_TOKEN",
@@ -291,6 +359,9 @@ def merge_config(args):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "proxy":
+        return _proxy_command(sys.argv[2] if len(sys.argv) > 2 else "status")
+
     default_config = os.path.expanduser("~/.config/mitmix/config.ini")
     parser = argparse.ArgumentParser(description="mitmix agent")
     parser.add_argument(
