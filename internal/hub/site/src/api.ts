@@ -193,6 +193,7 @@ interface Stats {
   status_codes: Record<string, number>
   methods: Record<string, number>
   top_hosts: { host: string; count: number }[]
+  top_apps: { app: string; count: number }[]
   hourly: { hour: string; count: number }[]
   success_rate: number
 }

@@ -17,12 +17,18 @@ type StatsResponse struct {
 	StatusCodes   map[string]int `json:"status_codes"`
 	Methods       map[string]int `json:"methods"`
 	TopHosts      []HostCount    `json:"top_hosts"`
+	TopApps       []AppCount     `json:"top_apps"`
 	Hourly        []HourlyCount  `json:"hourly"`
 	SuccessRate   float64        `json:"success_rate"`
 }
 
 type HostCount struct {
 	Host  string `json:"host"`
+	Count int    `json:"count"`
+}
+
+type AppCount struct {
+	App   string `json:"app"`
 	Count int    `json:"count"`
 }
 
@@ -98,6 +104,25 @@ func (h *Hub) handleStats(e *core.RequestEvent) error {
 		hrows.Close()
 	}
 
+	var apps []AppCount
+	arows, _ := h.DB().
+		Select("app_name", "count(*) as c").
+		From("flows").
+		Where(dbx.NewExp("app_name != ''")).
+		GroupBy("app_name").
+		OrderBy("c desc").
+		Limit(20).
+		Rows()
+	if arows != nil {
+		for arows.Next() {
+			var app string
+			var c int
+			arows.Scan(&app, &c)
+			apps = append(apps, AppCount{App: app, Count: c})
+		}
+		arows.Close()
+	}
+
 	cutoff := time.Now().Add(-24 * time.Hour).UTC().Format(time.RFC3339)
 	var hourly []HourlyCount
 	hhrows, _ := h.DB().
@@ -136,6 +161,7 @@ func (h *Hub) handleStats(e *core.RequestEvent) error {
 		StatusCodes:   statusCodes,
 		Methods:       methods,
 		TopHosts:      hosts,
+		TopApps:       apps,
 		Hourly:        hourly,
 		SuccessRate:   successRate,
 	})

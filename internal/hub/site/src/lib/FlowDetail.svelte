@@ -152,7 +152,7 @@
 </div>
 
 <style>
-  .panel { background: #161b22; border: 1px solid #30363d; border-radius: 6px; width: 480px; max-height: calc(100vh - 120px); overflow-y: auto; position: sticky; top: 0; }
+  .panel { background: #161b22; border: 1px solid #30363d; border-radius: 6px; width: 480px; max-height: calc(100vh - 120px); overflow-y: auto; }
   .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #30363d; gap: 8px; }
   .panel-header h3 { font-size: 14px; color: #c9d1d9; white-space: nowrap; }
   .header-actions { display: flex; gap: 4px; align-items: center; }

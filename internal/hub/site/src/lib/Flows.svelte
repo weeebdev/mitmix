@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { listFlows, fmtTime, connectLive } from '../api'
+  import { listFlows, fmtTime, connectLive, getStats } from '../api'
   import type { Flow } from '../api'
   import FlowDetail from './FlowDetail.svelte'
 
@@ -16,6 +16,7 @@
   let selected = $state<Flow | null>(null)
   let error = $state('')
   let newFlowIds = $state<Set<string>>(new Set())
+  let topApps = $state<string[]>([])
   let interval: number
   let cleanup: (() => void) | null = null
   let sortKey = $state<string>('captured_at')
@@ -88,6 +89,7 @@
     if (flowFilters.app) { app = flowFilters.app; filterApp = flowFilters.app }
     if (flowFilters.source) { source = flowFilters.source; filterSource = flowFilters.source }
     load()
+    getStats().then(s => { topApps = (s.top_apps || []).map(a => a.app) }).catch(() => {})
     interval = setInterval(load, 5000)
     cleanup = connectLive((msg) => {
       if (msg.action === 'flow_created') {
@@ -115,7 +117,12 @@
   </select>
   <input type="text" placeholder="Host" bind:value={host} />
   <input type="text" placeholder="Status" bind:value={status} />
-  <input type="text" placeholder="App" bind:value={app} />
+  <input type="text" placeholder="App" bind:value={app} list="app-suggestions" />
+  <datalist id="app-suggestions">
+    {#each topApps as a}
+      <option value={a} />
+    {/each}
+  </datalist>
   <input type="text" placeholder="Source Host" bind:value={source} />
   <button onclick={applyFilters}>Apply</button>
   <button class="clear" onclick={clearFilters}>Clear</button>
@@ -172,7 +179,7 @@
   .card { background: #161b22; padding: 16px; border-radius: 6px; border: 1px solid #30363d; margin-bottom: 16px; display: inline-block; }
   .card h3 { font-size: 12px; color: #8b949e; text-transform: uppercase; }
   .card .val { font-size: 28px; font-weight: 700; }
-  .flows-layout { display: flex; gap: 16px; align-items: flex-start; }
+  .flows-layout { display: flex; gap: 16px; align-items: flex-start; position: relative; }
   .flows-table { flex: 1; min-width: 0; }
   .detail-panel { flex-shrink: 0; }
   table { width: 100%; border-collapse: collapse; }
