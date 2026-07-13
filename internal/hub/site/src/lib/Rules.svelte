@@ -32,12 +32,17 @@
     } catch (e: any) { alert('Failed: ' + e.message) }
   }
 
+  function fmtObj(v: any): string {
+    if (typeof v === 'string') return v
+    try { return JSON.stringify(v) } catch { return String(v) }
+  }
+
   function startEdit(r: Rule) {
     editingId = r.id
     editAction = r.action
     editPriority = r.priority
-    editMatch = r.match
-    editSpec = r.spec
+    editMatch = fmtObj(r.match)
+    editSpec = fmtObj(r.spec)
   }
 
   function cancelEdit() {
@@ -107,7 +112,7 @@
           {:else}
             <td>{r.priority}</td><td>{r.node}</td>
             <td><span class="badge">{r.action}</span></td>
-            <td><code>{r.match}</code></td>
+            <td><code>{fmtObj(r.match)}</code></td>
             <td>{r.enabled ? '✅' : '❌'}</td>
             <td class="actions">
               <button class="small" onclick={() => startEdit(r)}>Edit</button>

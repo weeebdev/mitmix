@@ -229,9 +229,9 @@
   .card { background: #161b22; padding: 16px; border-radius: 6px; border: 1px solid #30363d; margin-bottom: 16px; display: inline-block; }
   .card h3 { font-size: 12px; color: #8b949e; text-transform: uppercase; }
   .card .val { font-size: 28px; font-weight: 700; }
-  .flows-layout { display: flex; gap: 16px; align-items: flex-start; position: relative; }
+  .flows-layout { display: flex; gap: 16px; align-items: flex-start; }
   .flows-table { flex: 1; min-width: 0; }
-  .detail-panel { flex-shrink: 0; position: sticky; top: 0; align-self: flex-start; max-height: calc(100vh - 100px); overflow-y: auto; }
+  .detail-panel { position: sticky; top: 16px; align-self: flex-start; max-height: calc(100vh - 120px); overflow-y: auto; }
   table { width: 100%; border-collapse: collapse; }
   th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #21262d; font-size: 13px; }
   th { color: #8b949e; font-weight: 600; }
