@@ -68,6 +68,9 @@ agent-stop:
 agent-logs:
 	@tail -f /tmp/mitmix-agent.log
 
+rebuild: build-dashboard
+	docker compose up --build -d
+
 build-hub:
 	cd internal/hub/site && npm run build && cd ../../..
 	docker compose up --build -d hub

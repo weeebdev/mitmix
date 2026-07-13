@@ -27,17 +27,20 @@
   let cleanup: (() => void) | null = null
   let sortKey = $state<string>('captured_at')
   let sortDir = $state<-1 | 1>(-1)
+  let reloadTimer: number | null = null
 
   let method = $state('')
   let host = $state('')
   let status = $state('')
   let app = $state('')
   let source = $state('')
+  let searchQ = $state('')
   let filterMethod = $state('')
   let filterHost = $state('')
   let filterStatus = $state('')
   let filterApp = $state('')
   let filterSource = $state('')
+  let filterQ = $state('')
   let filterSince = $state('')
   let timePreset = $state('all')
 
@@ -53,6 +56,7 @@
     if (filterStatus) p.status = filterStatus
     if (filterApp) p.app = filterApp
     if (filterSource) p.source = filterSource
+    if (filterQ) p.q = filterQ
     if (filterSince) p.since = filterSince
     return p
   }
@@ -105,13 +109,14 @@
     filterStatus = status
     filterApp = app
     filterSource = source
-    filterSince = timeSince(timePreset)
+    filterQ = searchQ
+    filterSince = timePreset === 'all' ? '' : timeSince(timePreset)
     load()
   }
 
   function clearFilters() {
-    method = ''; host = ''; status = ''; app = ''; source = ''
-    filterMethod = ''; filterHost = ''; filterStatus = ''; filterApp = ''; filterSource = ''
+    method = ''; host = ''; status = ''; app = ''; source = ''; searchQ = ''
+    filterMethod = ''; filterHost = ''; filterStatus = ''; filterApp = ''; filterSource = ''; filterQ = ''
     filterSince = ''
     load()
   }
@@ -159,6 +164,21 @@
     return 0
   }))
 
+  function hasActiveFilter(): boolean {
+    return !!(filterMethod || filterHost || filterStatus || filterApp || filterSource || filterQ || filterSince)
+  }
+
+  function flowMatchesFilter(f: Flow): boolean {
+    if (filterMethod && f.method !== filterMethod) return false
+    if (filterHost && !f.host.toLowerCase().includes(filterHost.toLowerCase())) return false
+    if (filterStatus && f.status_code.toString() !== filterStatus) return false
+    if (filterApp && f.app_name !== filterApp) return false
+    if (filterSource && f.source_host && !f.source_host.includes(filterSource)) return false
+    if (filterQ && !`${f.host} ${f.path} ${f.method} ${f.status_code}`.toLowerCase().includes(filterQ.toLowerCase())) return false
+    if (filterSince && f.captured_at && f.captured_at < filterSince) return false
+    return true
+  }
+
   onMount(() => {
     if (flowFilters.method) { method = flowFilters.method; filterMethod = flowFilters.method }
     if (flowFilters.host) { host = flowFilters.host; filterHost = flowFilters.host }
@@ -171,7 +191,14 @@
     cleanup = connectLive((msg) => {
       if (msg.action === 'flow_created') {
         const f = msg.data
-        flows = [f, ...flows].slice(0, 200)
+        if (hasActiveFilter()) {
+          if (flowMatchesFilter(f)) {
+            flows = [f, ...flows]
+          }
+        } else {
+          flows = [f, ...flows]
+        }
+        if (flows.length > 2000) flows = flows.slice(0, 1000)
         newFlowIds = new Set([f.id, ...newFlowIds])
         setTimeout(() => {
           newFlowIds = new Set([...newFlowIds].filter(id => id !== f.id))
@@ -202,6 +229,7 @@
     {/each}
   </datalist>
   <input type="text" placeholder="Source Host" bind:value={source} />
+  <input type="search" placeholder="Search host, path, method…" bind:value={searchQ} />
   <div class="time-group">
     {#each [['5m','5m'], ['30m','30m'], ['1h','1h'], ['6h','6h'], ['all','All']] as [val, lbl]}
       <button class:active={timePreset === val} onclick={() => setTime(val)}>{lbl}</button>

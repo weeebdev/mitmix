@@ -175,13 +175,17 @@ func (h *Hub) handleListFlows(e *core.RequestEvent) error {
 		filters = append(filters, "captured_at <= {:until}")
 		params["until"] = until
 	}
+	if q := e.Request.URL.Query().Get("q"); q != "" {
+		filters = append(filters, "(host ~ {:q} || path ~ {:q} || method ~ {:q})")
+		params["q"] = q
+	}
 
 	filter := "1=1"
 	if len(filters) > 0 {
 		filter = strings.Join(filters, " && ")
 	}
 
-	records, err := h.FindRecordsByFilter("flows", filter, "-captured_at", 500, 0, params)
+	records, err := h.FindRecordsByFilter("flows", filter, "-captured_at", 2000, 0, params)
 	if err != nil {
 		log.Printf("flows query error: %v", err)
 		return e.InternalServerError("query failed", err)

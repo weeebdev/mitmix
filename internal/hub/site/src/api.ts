@@ -127,7 +127,7 @@ export function isAuthed(): boolean { return !!getToken() }
 
 export function listNodes() { return api<Node[]>('GET', '/nodes') }
 export function listRules() { return api<Rule[]>('GET', '/rules') }
-export function listFlows(params?: { host?: string; method?: string; status?: string; app?: string; source?: string; since?: string; until?: string }) {
+export function listFlows(params?: { host?: string; method?: string; status?: string; app?: string; source?: string; q?: string; since?: string; until?: string }) {
   let q = ''
   if (params) {
     const p: string[] = []
@@ -136,6 +136,7 @@ export function listFlows(params?: { host?: string; method?: string; status?: st
     if (params.status) p.push('status=' + encodeURIComponent(params.status))
     if (params.app) p.push('app=' + encodeURIComponent(params.app))
     if (params.source) p.push('source=' + encodeURIComponent(params.source))
+    if (params.q) p.push('q=' + encodeURIComponent(params.q))
     if (params.since) p.push('since=' + encodeURIComponent(params.since))
     if (params.until) p.push('until=' + encodeURIComponent(params.until))
     if (p.length) q = '?' + p.join('&')

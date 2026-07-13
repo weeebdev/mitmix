@@ -68,14 +68,12 @@ class AgentAddon:
                 if flow.response and flow.response.headers
                 else {}
             )
-            req_body = (flow.request.content or b"")[:102400].decode(
-                "utf-8", errors="replace"
-            )
+            req_content = flow.request.content or b""
+            resp_content = flow.response.content if flow.response else None
+            req_body = req_content[:102400].decode("utf-8", errors="replace")
             resp_body = (
-                (flow.response.content or b"")[:102400].decode(
-                    "utf-8", errors="replace"
-                )
-                if flow.response
+                resp_content[:102400].decode("utf-8", errors="replace")
+                if resp_content
                 else ""
             )
             src_ip = flow.client_conn.peername[0] if flow.client_conn.peername else ""
@@ -105,8 +103,8 @@ class AgentAddon:
                 "resp_headers": resp_headers,
                 "req_body": req_body,
                 "resp_body": resp_body,
-                "req_size": len(flow.request.content or b""),
-                "resp_size": len(flow.response.content or b"") if flow.response else 0,
+                "req_size": len(req_content),
+                "resp_size": len(resp_content) if resp_content else 0,
                 "duration_ms": int(
                     (flow.response.timestamp_end - flow.request.timestamp_start) * 1000
                 )
@@ -126,7 +124,12 @@ class AgentAddon:
 
     def _should_skip(self, flow):
         host = flow.request.host
-        if host == self.hub_host or host.startswith("127.") or host == "localhost" or host == "::1":
+        if (
+            host == self.hub_host
+            or host.startswith("127.")
+            or host == "localhost"
+            or host == "::1"
+        ):
             return True
         if not self.allow_hosts and not self.ignore_hosts:
             return False
