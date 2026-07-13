@@ -33,9 +33,10 @@ hub, pull rules, apply them to live traffic, and stream captured flows back.
 ## Build / run
 - Hub: `nix develop && go run . serve` — PocketBase on `:8090`.
   Auto-creates admin: `admin@mitm.local` / `mitmadmin123`.
-- Agent: `docker compose up -d` or manually:
+- Agent: `docker compose up --build -d` or manually:
   `cd agent && pip install -e . && python mitm_agent.py --hub ws://localhost:8090 --token <node_token>`
-- Agent mitmproxy listens on `:8082` (port 8080 taken by OrbStack).
+- Agent mitmproxy listens on `:8082`.
+- Always use `docker compose up --build -d` (NOT `docker compose up -d --build <service>`) for full rebuild.
 
 ## Dashboard
 Svelte 5 at `internal/hub/site/`. Rebuild:
@@ -96,5 +97,20 @@ headers + body content in tabs.
 - Use `git worktree` for any file edits per global AGENTS.md.
 
 ## Status
-Phase 1 (hub skeleton) + Phase 2 (agent skeleton) + Phase 3 (auth+rule sync) +
-Phase 4 (flow capture) + Phase 5 (dashboard) complete. Phase 6 (MCP) next.
+Phase 1-5 complete, committed, pushed to `upstream/mega-features`.
+- Stats dashboard with clickable charts (Stats.svelte + GET /api/mitm/stats)
+- Multi-collection login (_superusers + users)
+- Agent alerts via WS: ws.go broadcasts node_up/node_down, Nodes.svelte auto-refreshes
+- compose.yaml hub env: FLOW_RETENTION_HOURS, HUB_TLS_CERT/KEY, HUB_HTTPS
+
+## Tailscale exit node (next)
+Agent can join a Tailscale tailnet as exit node, so non-agent Tailscale devices
+route traffic through mitmproxy. Implemented via:
+- `--tailscale` flag on agent CLI
+- `tailscale` binary installed in agent Dockerfile
+- On startup: `tailscale up --auth-key=TS_AUTH_KEY --advertise-routes=0.0.0.0/0,::/0`
+- mitmproxy captures all traffic routed through the exit node
+
+Env vars for Tailscale agent:
+- `TS_AUTH_KEY` — Tailscale auth key (reusable, pre-approved)
+- `TS_HOSTNAME` — optional hostname for the agent node

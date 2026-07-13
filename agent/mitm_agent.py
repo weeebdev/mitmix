@@ -1,6 +1,8 @@
 import argparse
 import asyncio
 import logging
+import os
+import subprocess
 import threading
 import time
 
@@ -131,6 +133,39 @@ class AgentAddon:
         pass
 
 
+def _start_tailscale():
+    auth_key = os.environ.get("TS_AUTH_KEY", "")
+    if not auth_key:
+        logger.error("TS_AUTH_KEY required for --tailscale mode")
+        return
+    hostname = os.environ.get("TS_HOSTNAME", "mitmix-agent")
+    try:
+        subprocess.run(
+            ["tailscaled", "--tun=userspace-networking", "--state=mem:"],
+            check=False,
+        )
+        result = subprocess.run(
+            [
+                "tailscale",
+                "up",
+                "--auth-key=" + auth_key,
+                "--hostname=" + hostname,
+                "--advertise-routes=0.0.0.0/0,::/0",
+                "--accept-routes",
+                "--accept-dns=false",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            logger.info("tailscale up: connected as %s", hostname)
+        else:
+            logger.warning("tailscale up failed: %s", result.stderr.strip())
+    except Exception as e:
+        logger.error("tailscale startup error: %s", e)
+
+
 def _host_match(pattern, host):
     if pattern == "*" or pattern == "":
         return True
@@ -158,6 +193,9 @@ def main():
     parser.add_argument(
         "--ignore-hosts", default="", help="Comma-sep host globs to skip"
     )
+    parser.add_argument(
+        "--tailscale", action="store_true", help="Join tailnet as exit node"
+    )
     args = parser.parse_args()
 
     allow_hosts = (
@@ -182,6 +220,9 @@ def main():
     if ignore_hosts:
         opts.update(ignore_hosts=ignore_hosts)
         logger.info("ignoring hosts: %s", ignore_hosts)
+
+    if args.tailscale:
+        _start_tailscale()
 
     async def run():
         agent = AgentAddon(

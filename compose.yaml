@@ -23,6 +23,9 @@ services:
     restart: unless-stopped
     ports:
       - "8082:8082"
+    environment:
+      - TS_AUTH_KEY=${TS_AUTH_KEY:-}
+      - TS_HOSTNAME=${TS_HOSTNAME:-mitmix-agent}
     command: ["--hub", "ws://hub:8090", "--token", "test-agent-token", "--listen", "0.0.0.0:8082"]
     depends_on:
       - hub
