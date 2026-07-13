@@ -1,7 +1,7 @@
 FROM python:3.13-slim AS base
 WORKDIR /app
 COPY agent/ ./
-RUN pip install --no-cache-dir mitmproxy aiohttp websockets
+RUN pip install --no-cache-dir -e .
 
 FROM base AS tailscale
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -10,4 +10,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -fsSL https://tailscale.com/install.sh | sh
 
 FROM tailscale
-ENTRYPOINT ["python", "mitm_agent.py"]
+ENTRYPOINT ["mitmix-agent"]

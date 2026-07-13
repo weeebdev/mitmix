@@ -1,13 +1,14 @@
 [project]
-name = "mitm-agent"
+name = "mitmix-agent"
 version = "0.1.0"
-description = "mitmproxy agent for mitm-decentralized hub"
+description = "mitmproxy agent for mitmix decentralized proxy hub"
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.11"
 dependencies = [
-    "mitmproxy>=10",
-    "pocketbase>=0.14",
-    "websockets>=12",
+    "mitmproxy>=10,<13",
     "aiohttp>=3.9",
+    "websockets>=12",
 ]
 
 [project.optional-dependencies]
@@ -15,3 +16,10 @@ test = [
     "pytest>=8",
     "pytest-asyncio>=0.23",
 ]
+
+[project.scripts]
+mitmix-agent = "mitm_agent:main"
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.backends._legacy:_Backend"

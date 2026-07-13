@@ -60,6 +60,9 @@ func (h *Hub) handleAgentConnect(e *core.RequestEvent) error {
 	if fp, ok := data["fingerprint"].(string); ok {
 		ac.Node = fp
 	}
+	if cert, ok := data["ca_cert"].(string); ok && cert != "" {
+		h.ws.StoreCACert(token, cert)
+	}
 
 	h.ws.Register(token, ac)
 	h.upsertNode(tokenRec, ac)

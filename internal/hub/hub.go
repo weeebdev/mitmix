@@ -91,6 +91,7 @@ func (h *Hub) registerRoutes(se *core.ServeEvent) {
 	api.POST("/tokens", h.handleCreateToken)
 	api.DELETE("/tokens/{id}", h.handleDeleteToken)
 	api.GET("/stats", h.handleStats)
+	api.GET("/ca-cert", h.handleCACert)
 	api.GET("/queries", h.handleListQueries)
 	api.POST("/queries", h.handleCreateQuery)
 	api.DELETE("/queries/{id}", h.handleDeleteQuery)

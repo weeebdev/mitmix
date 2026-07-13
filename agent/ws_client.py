@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import platform
 
 import websockets
@@ -27,7 +28,9 @@ class HubWebSocketClient:
         headers = {"X-Token": self.token}
         while True:
             try:
-                async with websockets.connect(self.ws_url, additional_headers=headers) as ws:
+                async with websockets.connect(
+                    self.ws_url, additional_headers=headers
+                ) as ws:
                     logger.info("connected to hub")
                     async for message in ws:
                         if not await self._handle(ws, json.loads(message)):
@@ -64,9 +67,26 @@ class HubWebSocketClient:
 
     async def _handle_auth(self, ws, data):
         fingerprint = f"{platform.node()}-{platform.machine()}"
-        await ws.send(json.dumps({
-            "action": "auth_response",
-            "data": {"fingerprint": fingerprint},
-        }))
+        cert_pem = ""
+        try:
+            cert_path = os.path.expanduser("~/.mitmproxy/mitmproxy-ca-cert.pem")
+            if os.path.exists(cert_path):
+                with open(cert_path) as f:
+                    cert_pem = f.read()
+            else:
+                alt_path = "/root/.mitmproxy/mitmproxy-ca-cert.pem"
+                if os.path.exists(alt_path):
+                    with open(alt_path) as f:
+                        cert_pem = f.read()
+        except Exception as e:
+            logger.debug("ca cert read skipped: %s", e)
+        await ws.send(
+            json.dumps(
+                {
+                    "action": "auth_response",
+                    "data": {"fingerprint": fingerprint, "ca_cert": cert_pem},
+                }
+            )
+        )
         logger.info("auth response sent")
         return True

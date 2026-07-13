@@ -41,16 +41,35 @@ func (a *AgentConn) Close() {
 }
 
 type WSManager struct {
-	hub  *Hub
-	mu   sync.RWMutex
-	conn map[string]*AgentConn
+	hub     *Hub
+	mu      sync.RWMutex
+	conn    map[string]*AgentConn
+	caCerts map[string]string
 }
 
 func NewWSManager(h *Hub) *WSManager {
 	return &WSManager{
-		hub:  h,
-		conn: make(map[string]*AgentConn),
+		hub:     h,
+		conn:    make(map[string]*AgentConn),
+		caCerts: make(map[string]string),
 	}
+}
+
+func (m *WSManager) StoreCACert(token, pem string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.caCerts[token] = pem
+}
+
+func (m *WSManager) GetCACert() (string, string) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for token, pem := range m.caCerts {
+		if pem != "" {
+			return token, pem
+		}
+	}
+	return "", ""
 }
 
 func (m *WSManager) Register(token string, ac *AgentConn) {

@@ -50,9 +50,14 @@ Then rebuild Go binary. Assets embedded via `//go:embed`.
   `pip install -e '.[test]'`, `python -m pytest`
 - Hub: `go test ./...`
 
+## Docs
+- `docs/agent.md` — agent setup, CLI flags, cert install, tailscale
+- `docs/dashboard.md` — dashboard tabs, API, live updates, retention
+- `docs/deployment.md` — Docker compose, env vars, TLS, persistence
+
 ## Auth
 - Dashboard login: POST `/api/collections/_superusers/auth-with-password`
-  (identity/password). Token stored in localStorage `pb_token`.
+  or `/api/collections/users/auth-with-password`. Dashboard tries superusers first, then users.
 - Agent auth: X-Token header on WS upgrade. No PB auth required.
 - Flow ingest: X-Token header validation against `node_tokens`.
 
@@ -63,7 +68,6 @@ Then rebuild Go binary. Assets embedded via `//go:embed`.
 | POST | `/api/mitm/flows` | X-Token | Batch flow ingest (+ body capture) |
 | GET | `/api/mitm/flows` | PB | List flows (?host=, ?method=, ?status=) |
 | GET | `/api/mitm/flows/{id}` | PB | Flow detail with bodies |
-| GET | `/api/mitm/stats` | PB | Aggregated flow stats (counts, durations, status codes, methods, hourly) |
 | GET | `/api/mitm/rules` | PB | List rules |
 | POST | `/api/mitm/rules` | PB | Create rule (live push to agents) |
 | PUT | `/api/mitm/rules/{id}` | PB | Update rule |
@@ -73,6 +77,12 @@ Then rebuild Go binary. Assets embedded via `//go:embed`.
 | GET | `/api/mitm/tokens` | PB | List node tokens |
 | POST | `/api/mitm/tokens` | PB | Generate token (crypto/rand base62) |
 | DELETE | `/api/mitm/tokens/{id}` | PB | Revoke token |
+| GET | `/api/mitm/stats` | PB | Aggregated flow stats |
+| GET | `/api/mitm/ca-cert` | — | Download mitmproxy CA cert PEM |
+| GET | `/api/mitm/queries` | PB | List saved queries |
+| POST | `/api/mitm/queries` | PB | Create query |
+| DELETE | `/api/mitm/queries/{id}` | PB | Delete query |
+| GET | `/api/mitm/queries/{id}/run` | PB | Execute query |
 | GET | `/dashboard/{path...}` | — | Svelte dashboard (unauthed, login page) |
 
 ## Rule actions

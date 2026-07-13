@@ -35,6 +35,7 @@
     <button class={tab === 'queries' ? 'active' : ''} onclick={() => tab = 'queries'}>Queries</button>
     <button class={tab === 'tokens' ? 'active' : ''} onclick={() => tab = 'tokens'}>Tokens</button>
     <span class="spacer"></span>
+    <a href="/api/mitm/ca-cert" download class="cert-link">Download CA</a>
     <button class="logout" onclick={doLogout}>Logout</button>
   </nav>
 
@@ -66,5 +67,7 @@
   nav .spacer { flex: 1; }
   nav .logout { color: #f85149; }
   nav .logout:hover { background: #3d1414; }
+  nav .cert-link { color: #58a6ff; text-decoration: none; font-size: 14px; padding: 4px 12px; border-radius: 4px; }
+  nav .cert-link:hover { background: #21262d; }
   main { padding: 24px; max-width: 1200px; margin: 0 auto; }
 </style>
