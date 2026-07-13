@@ -3,6 +3,8 @@ import asyncio
 import configparser
 import logging
 import os
+import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -63,14 +65,17 @@ class AgentAddon:
                 if flow.response and flow.response.headers
                 else {}
             )
-            req_body = (flow.request.content or b"")[:102400].decode(
-                "utf-8", errors="replace"
+            decrypt = self.rule_engine.has_action(flow, "decrypt")
+            req_body = (
+                (flow.request.content or b"")[:102400].decode("utf-8", errors="replace")
+                if decrypt
+                else ""
             )
             resp_body = (
                 (flow.response.content or b"")[:102400].decode(
                     "utf-8", errors="replace"
                 )
-                if flow.response
+                if flow.response and decrypt
                 else ""
             )
             src_ip = flow.client_conn.peername[0] if flow.client_conn.peername else ""
@@ -336,17 +341,69 @@ def _get_network_service():
     return "Wi-Fi"
 
 
+def _install_cert_firefox(hub_url=None):
+    import glob
+
+    pem_path = os.path.expanduser("~/.mitmproxy/mitmproxy-ca-cert.pem")
+    if not os.path.exists(pem_path):
+        _install_cert(hub_url=hub_url)
+    profiles = glob.glob(
+        os.path.expanduser("~/.mozilla/firefox/*.default*")
+    ) + glob.glob(os.path.expanduser("~/.mozilla/firefox/*.default-esr"))
+    if not profiles:
+        print("No Firefox profile found at ~/.mozilla/firefox/")
+        sys.exit(1)
+    prof = profiles[0]
+    prof_path = os.path.join(prof, "cert9.db")
+    if not os.path.exists(prof_path):
+        print("No cert9.db found in %s" % prof)
+        sys.exit(1)
+    certutil = shutil.which("certutil")
+    if not certutil:
+        print("certutil not found. Install it:")
+        print("  brew install nss")
+        sys.exit(1)
+    r = subprocess.run(
+        [
+            certutil,
+            "-A",
+            "-n",
+            "mitmix CA",
+            "-t",
+            "TCu,Cu,Tu",
+            "-i",
+            pem_path,
+            "-d",
+            "sql:" + prof,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if r.returncode == 0:
+        print("Installed mitmix CA into Firefox profile: %s" % prof)
+    else:
+        print("Error installing cert into Firefox: %s" % r.stderr.strip())
+        sys.exit(1)
+
+
 def _cert_command(args):
     if not args or args[0] == "install":
         parser = argparse.ArgumentParser(description="install mitmix CA cert")
         parser.add_argument("--hub", help="Hub URL to download cert from")
         parsed, _ = parser.parse_known_args(args[1:] if args else [])
         _install_cert(hub_url=parsed.hub)
+    elif args[0] == "install-firefox":
+        parser = argparse.ArgumentParser(description="install CA cert into Firefox")
+        parser.add_argument("--hub", help="Hub URL to download cert from")
+        parsed, _ = parser.parse_known_args(args[1:] if args else [])
+        _install_cert_firefox(hub_url=parsed.hub)
     elif args[0] == "path":
         p = os.path.expanduser("~/.mitmproxy/mitmproxy-ca-cert.pem")
         print(p)
     else:
         print("Usage: mitmix-agent cert install [--hub ws://...]")
+        print("       mitmix-agent cert install-firefox [--hub ws://...]")
         print("       mitmix-agent cert path")
         sys.exit(1)
 

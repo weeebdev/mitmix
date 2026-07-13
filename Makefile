@@ -75,6 +75,20 @@ build-hub:
 build-dashboard:
 	cd internal/hub/site && npm run build
 
+cert-install-firefox:
+	@echo "Installing mitmix CA cert into Firefox..."
+	@if ! which certutil >/dev/null 2>&1; then \
+		echo "certutil not found. Run: brew install nss"; \
+		exit 1; \
+	fi
+	@PROFILE=$$(ls -d ~/.mozilla/firefox/*.default* ~/.mozilla/firefox/*.default-esr 2>/dev/null | head -1); \
+	if [ -z "$$PROFILE" ]; then \
+		echo "No Firefox profile found at ~/.mozilla/firefox/"; \
+		exit 1; \
+	fi; \
+	certutil -A -n "mitmix CA" -t "TCu,Cu,Tu" -i ~/.mitmproxy/mitmproxy-ca-cert.pem -d "sql:$$PROFILE" && \
+	echo "Done. Restart Firefox." || echo "Failed."
+
 cert-install:
 	@echo "Installing mitmix CA cert..."
 	@if [ -f ~/.mitmproxy/mitmproxy-ca-cert.pem ]; then \

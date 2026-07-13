@@ -14,6 +14,7 @@ ACTION_MODIFY_BODY = "modify_body"
 ACTION_REDIRECT = "redirect"
 ACTION_DROP = "drop"
 ACTION_RECORD = "record"
+ACTION_DECRYPT = "decrypt"
 ACTION_COPY_REQUEST = "copy_request"
 ACTION_REPLICATE = "replicate"
 ACTION_REWRITE = "rewrite"
@@ -24,6 +25,7 @@ ACTIONS = {
     ACTION_REDIRECT,
     ACTION_DROP,
     ACTION_RECORD,
+    ACTION_DECRYPT,
     ACTION_COPY_REQUEST,
     ACTION_REPLICATE,
     ACTION_REWRITE,
@@ -67,11 +69,13 @@ class RuleEngine:
     def _compile_glob(self, pattern):
         return re.compile(fnmatch.translate(pattern or "*"))
 
-    def matching(self, flow):
+    def matching(self, flow, action_filter=None):
         for r in self.rules:
             if not r["enabled"]:
                 continue
             if r["action"] not in ACTIONS:
+                continue
+            if action_filter and r["action"] != action_filter:
                 continue
             req = flow.request
             if r["method"] != "*" and (req.method or "").upper() != r["method"]:
@@ -81,6 +85,11 @@ class RuleEngine:
             if not r["path_re"].match(req.path.split("?", 1)[0]):
                 continue
             yield r
+
+    def has_action(self, flow, action):
+        for r in self.matching(flow, action_filter=action):
+            return True
+        return False
 
     def request(self, flow):
         for rule in self.matching(flow):
@@ -105,6 +114,7 @@ class RuleEngine:
             if "application/json" in ctype and text is not None:
                 try:
                     import json
+
                     data = flow.request.json()
                     data.update(json.loads(text))
                     flow.request.text = json.dumps(data)

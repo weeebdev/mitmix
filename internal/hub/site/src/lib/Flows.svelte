@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { listFlows, fmtTime, connectLive, getStats } from '../api'
-  import type { Flow } from '../api'
+  import { listFlows, fmtTime, connectLive, getStats, listRules, createRule, deleteRule } from '../api'
+  import type { Flow, Rule } from '../api'
   import FlowDetail from './FlowDetail.svelte'
 
   let {
@@ -17,6 +17,9 @@
   let error = $state('')
   let newFlowIds = $state<Set<string>>(new Set())
   let topApps = $state<string[]>([])
+  let decryptRules = $state<Map<string, string>>(new Map())
+  let interceptRules = $state<Map<string, string>>(new Map())
+  let rulesLoaded = $state(false)
   let interval: number
   let cleanup: (() => void) | null = null
   let sortKey = $state<string>('captured_at')
@@ -46,6 +49,39 @@
   async function load() {
     try { flows = await listFlows(getFilterParams()) }
     catch (e: any) { error = e.message }
+  }
+
+  async function loadRules() {
+    try {
+      const all = await listRules()
+      const dr = new Map<string, string>()
+      const ir = new Map<string, string>()
+      for (const r of all) {
+        if (!r.enabled) continue
+        let host = ''
+        try { host = JSON.parse(r.match).host || '' } catch {}
+        if (!host) continue
+        if (r.action === 'decrypt') dr.set(host, r.id)
+        if (r.action === 'intercept') ir.set(host, r.id)
+      }
+      decryptRules = dr
+      interceptRules = ir
+      rulesLoaded = true
+    } catch {}
+  }
+
+  async function toggleAction(host: string, action: string, ruleId: string | undefined) {
+    if (ruleId) {
+      await deleteRule(ruleId)
+    } else {
+      await createRule({
+        action,
+        match: JSON.stringify({ host: '*.' + host.split('.').slice(-2).join('.') }),
+        priority: 100,
+        enabled: true,
+      } as any)
+    }
+    loadRules()
   }
 
   function applyFilters() {
@@ -90,6 +126,7 @@
     if (flowFilters.source) { source = flowFilters.source; filterSource = flowFilters.source }
     load()
     getStats().then(s => { topApps = (s.top_apps || []).map(a => a.app) }).catch(() => {})
+    loadRules()
     interval = setInterval(load, 5000)
     cleanup = connectLive((msg) => {
       if (msg.action === 'flow_created') {
@@ -120,7 +157,7 @@
   <input type="text" placeholder="App" bind:value={app} list="app-suggestions" />
   <datalist id="app-suggestions">
     {#each topApps as a}
-      <option value={a} />
+      <option value={a}></option>
     {/each}
   </datalist>
   <input type="text" placeholder="Source Host" bind:value={source} />
@@ -140,6 +177,7 @@
         <th onclick={() => toggleSort('app_name')} class="sort">{sortIcon('app_name')} App</th>
         <th onclick={() => toggleSort('source_host')} class="sort">{sortIcon('source_host')} Source</th>
         <th onclick={() => toggleSort('duration_ms')} class="sort">{sortIcon('duration_ms')} Dur</th>
+        <th>Actions</th>
       </tr></thead>
       <tbody>
         {#if flows.length}
@@ -159,10 +197,22 @@
                 {:else}—{/if}
               </td>
               <td>{f.duration_ms}ms</td>
+              <td class="actions">
+                {#if rulesLoaded}
+                  <button class="action-btn decrypt" title="Decrypt (capture bodies)" onclick={(e) => { e.stopPropagation(); toggleAction(f.host.replace(/:.*/, ''), 'decrypt', decryptRules.get('*.' + f.host.replace(/:.*/, '').split('.').slice(-2).join('.'))) }}>
+                    {decryptRules.has('*.' + f.host.replace(/:.*/, '').split('.').slice(-2).join('.')) ? '🔓' : '🔒'}
+                  </button>
+                  <button class="action-btn intercept" title="Intercept (pause)" onclick={(e) => { e.stopPropagation(); toggleAction(f.host.replace(/:.*/, ''), 'intercept', interceptRules.get('*.' + f.host.replace(/:.*/, '').split('.').slice(-2).join('.'))) }}>
+                    {interceptRules.has('*.' + f.host.replace(/:.*/, '').split('.').slice(-2).join('.')) ? '⏸' : '⏭'}
+                  </button>
+                {:else}
+                  <span class="loading">…</span>
+                {/if}
+              </td>
             </tr>
           {/each}
         {:else}
-          <tr><td colspan="8" class="empty">No flows captured{error ? ': ' + error : ''}</td></tr>
+          <tr><td colspan="9" class="empty">No flows captured{error ? ': ' + error : ''}</td></tr>
         {/if}
       </tbody>
     </table>
@@ -200,4 +250,10 @@
   .filter-bar button.clear { color: #8b949e; }
   .link { background: none; border: none; color: #58a6ff; cursor: pointer; padding: 0; font: inherit; text-decoration: underline; }
   .link:hover { color: #79c0ff; }
+  .actions { white-space: nowrap; display: flex; gap: 2px; }
+  .action-btn { background: none; border: 1px solid #30363d; border-radius: 3px; cursor: pointer; font-size: 12px; padding: 1px 4px; line-height: 1.4; }
+  .action-btn:hover { background: #21262d; }
+  .action-btn.decrypt:hover { border-color: #58a6ff; }
+  .action-btn.intercept:hover { border-color: #d29922; }
+  .loading { color: #8b949e; font-size: 12px; }
 </style>
