@@ -88,6 +88,11 @@ func (h *Hub) handleIngestFlows(e *core.RequestEvent) error {
 		}
 	}
 
+	stats, err := computeStats(h)
+	if err == nil {
+		broadcastToDash(map[string]any{"action": "stats_update", "data": stats})
+	}
+
 	return e.JSON(200, map[string]any{"ingested": len(req.Flows)})
 }
 

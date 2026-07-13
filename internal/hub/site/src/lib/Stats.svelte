@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
-  import { getStats } from '../api'
+  import { onMount, onDestroy } from 'svelte'
+  import { getStats, connectLive } from '../api'
   import type { Stats } from '../api'
 
   let { onNavigate = (_: any) => {} }: { onNavigate?: (nav: { tab: string; params?: Record<string, string> }) => void } = $props()
@@ -8,8 +8,19 @@
   let stats = $state<Stats | null>(null)
   let error = $state('')
   let loading = $state(true)
+  let cleanup: (() => void) | null = null
 
-  onMount(() => load())
+  onMount(() => {
+    load()
+    cleanup = connectLive((msg) => {
+      if (msg.action === 'stats_update') {
+        stats = msg.data
+      }
+    })
+  })
+  onDestroy(() => {
+    if (cleanup) cleanup()
+  })
 
   async function load() {
     loading = true; error = ''

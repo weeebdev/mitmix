@@ -37,7 +37,8 @@ type HourlyCount struct {
 	Count int    `json:"count"`
 }
 
-func (h *Hub) handleStats(e *core.RequestEvent) error {
+func computeStats(h *Hub) (StatsResponse, error) {
+	var s StatsResponse
 	q := h.DB().
 		Select("count(*)").
 		From("flows")
@@ -45,6 +46,7 @@ func (h *Hub) handleStats(e *core.RequestEvent) error {
 	if err := q.Row(&total); err != nil {
 		total = 0
 	}
+	s.TotalFlows = total
 
 	var avgDuration float64
 	var maxDuration int
@@ -53,6 +55,10 @@ func (h *Hub) handleStats(e *core.RequestEvent) error {
 		Select("coalesce(avg(duration_ms),0)", "coalesce(max(duration_ms),0)", "coalesce(sum(req_size),0)", "coalesce(sum(resp_size),0)").
 		From("flows").
 		Row(&avgDuration, &maxDuration, &totalReq, &totalResp)
+	s.DurationAvg = avgDuration
+	s.DurationMax = maxDuration
+	s.TotalReqSize = totalReq
+	s.TotalRespSize = totalResp
 
 	statusCodes := map[string]int{}
 	rows, _ := h.DB().
@@ -69,6 +75,7 @@ func (h *Hub) handleStats(e *core.RequestEvent) error {
 		}
 		rows.Close()
 	}
+	s.StatusCodes = statusCodes
 
 	methods := map[string]int{}
 	mrows, _ := h.DB().
@@ -85,6 +92,7 @@ func (h *Hub) handleStats(e *core.RequestEvent) error {
 		}
 		mrows.Close()
 	}
+	s.Methods = methods
 
 	var hosts []HostCount
 	hrows, _ := h.DB().
@@ -103,6 +111,7 @@ func (h *Hub) handleStats(e *core.RequestEvent) error {
 		}
 		hrows.Close()
 	}
+	s.TopHosts = hosts
 
 	var apps []AppCount
 	arows, _ := h.DB().
@@ -122,6 +131,7 @@ func (h *Hub) handleStats(e *core.RequestEvent) error {
 		}
 		arows.Close()
 	}
+	s.TopApps = apps
 
 	cutoff := time.Now().Add(-24 * time.Hour).UTC().Format(time.RFC3339)
 	var hourly []HourlyCount
@@ -141,6 +151,7 @@ func (h *Hub) handleStats(e *core.RequestEvent) error {
 		}
 		hhrows.Close()
 	}
+	s.Hourly = hourly
 
 	var successRate float64
 	if total > 0 {
@@ -151,20 +162,17 @@ func (h *Hub) handleStats(e *core.RequestEvent) error {
 			Row(&success)
 		successRate = float64(success) / float64(total) * 100
 	}
+	s.SuccessRate = successRate
 
-	return e.JSON(200, StatsResponse{
-		TotalFlows:    total,
-		DurationAvg:   avgDuration,
-		DurationMax:   maxDuration,
-		TotalReqSize:  totalReq,
-		TotalRespSize: totalResp,
-		StatusCodes:   statusCodes,
-		Methods:       methods,
-		TopHosts:      hosts,
-		TopApps:       apps,
-		Hourly:        hourly,
-		SuccessRate:   successRate,
-	})
+	return s, nil
+}
+
+func (h *Hub) handleStats(e *core.RequestEvent) error {
+	stats, err := computeStats(h)
+	if err != nil {
+		return e.InternalServerError("stats failed", err)
+	}
+	return e.JSON(200, stats)
 }
 
 

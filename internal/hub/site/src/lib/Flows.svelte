@@ -19,7 +19,6 @@
   let topApps = $state<string[]>([])
   let interceptRules = $state<Map<string, string>>(new Map())
   let rulesLoaded = $state(false)
-  let interval: number
   let panelX = $state(0)
   let panelY = $state(0)
   let dragging = $state(false)
@@ -168,7 +167,7 @@
     if (flowFilters.source) { source = flowFilters.source; filterSource = flowFilters.source }
     load()
     loadRules()
-    interval = setInterval(() => { load(); getStats().then(s => { topApps = (s.top_apps || []).map(a => a.app) }).catch(() => {}) }, 5000)
+    getStats().then(s => { topApps = (s.top_apps || []).map(a => a.app) }).catch(() => {})
     cleanup = connectLive((msg) => {
       if (msg.action === 'flow_created') {
         const f = msg.data
@@ -177,11 +176,12 @@
         setTimeout(() => {
           newFlowIds = new Set([...newFlowIds].filter(id => id !== f.id))
         }, 2000)
+      } else if (msg.action === 'stats_update') {
+        topApps = (msg.data.top_apps || []).map(a => a.app)
       }
     })
   })
   onDestroy(() => {
-    clearInterval(interval)
     if (cleanup) cleanup()
   })
 </script>
