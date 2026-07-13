@@ -1,8 +1,10 @@
 import argparse
 import asyncio
+import configparser
 import logging
 import os
 import subprocess
+import sys
 import threading
 import time
 
@@ -133,6 +135,67 @@ class AgentAddon:
         pass
 
 
+def _install_cert(hub_url):
+    if not hub_url:
+        print("ERROR: --hub or MITMIX_HUB required for --install-cert")
+        sys.exit(1)
+    rest_url = hub_url.replace("ws://", "http://").replace("wss://", "https://")
+    cert_url = rest_url.rstrip("/") + "/api/mitm/ca-cert"
+    import urllib.request, urllib.error
+
+    pem_path = os.path.expanduser("~/.mitmproxy/mitmproxy-ca-cert.pem")
+    try:
+        resp = urllib.request.urlopen(cert_url, timeout=10)
+        pem = resp.read()
+    except urllib.error.HTTPError as e:
+        print("ERROR: hub returned %d — no CA cert registered yet" % e.code)
+        sys.exit(1)
+    except Exception as e:
+        print("ERROR: cannot fetch CA cert from %s: %s" % (cert_url, e))
+        sys.exit(1)
+    os.makedirs(os.path.dirname(pem_path), exist_ok=True)
+    with open(pem_path, "wb") as f:
+        f.write(pem)
+    print("CA cert saved to %s" % pem_path)
+    if sys.platform == "darwin":
+        import tempfile, shutil
+
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pem")
+        tmp.write(pem)
+        tmp.close()
+        subprocess.run(
+            [
+                "security",
+                "add-trusted-cert",
+                "-d",
+                "-r",
+                "trustRoot",
+                "-k",
+                "/Library/Keychains/System.keychain",
+                tmp.name,
+            ],
+            check=False,
+        )
+        os.unlink(tmp.name)
+        print("Installed to macOS System keychain (requires sudo)")
+    elif sys.platform.startswith("linux"):
+        cert_dir = "/usr/local/share/ca-certificates"
+        cert_path = os.path.join(cert_dir, "mitmproxy-ca-cert.crt")
+        try:
+            with open(cert_path, "wb") as f:
+                f.write(pem)
+            subprocess.run(["update-ca-certificates"], check=False)
+            print("Installed to %s" % cert_path)
+        except PermissionError:
+            print(
+                "CA cert saved. Install manually:\n"
+                "  sudo cp %s /usr/local/share/ca-certificates/mitmproxy-ca-cert.crt\n"
+                "  sudo update-ca-certificates" % pem_path
+            )
+    else:
+        print("CA cert saved to %s. Install manually for your OS." % pem_path)
+
+
 def _start_tailscale():
     auth_key = os.environ.get("TS_AUTH_KEY", "")
     if not auth_key:
@@ -178,12 +241,55 @@ def _host_match(pattern, host):
     return False
 
 
+ENV_MAP = {
+    "hub": "MITMIX_HUB",
+    "token": "MITMIX_TOKEN",
+    "listen": "MITMIX_LISTEN",
+    "allow_hosts": "MITMIX_ALLOW_HOSTS",
+    "ignore_hosts": "MITMIX_IGNORE_HOSTS",
+    "tailscale": "MITMIX_TAILSCALE",
+}
+
+
+def merge_config(args):
+    for key, env_name in ENV_MAP.items():
+        val = os.environ.get(env_name)
+        if val is not None:
+            if key == "tailscale":
+                val = val.lower() in ("1", "true", "yes")
+            setattr(args, key, val)
+    cfg = configparser.ConfigParser()
+    cfg.read(args.config)
+    for key, section in [
+        ("hub", "agent"),
+        ("token", "agent"),
+        ("listen", "agent"),
+        ("allow_hosts", "agent"),
+        ("ignore_hosts", "agent"),
+        ("tailscale", "agent"),
+    ]:
+        if getattr(args, key, None) is None or (
+            isinstance(getattr(args, key, None), str) and getattr(args, key) == ""
+        ):
+            try:
+                val = cfg.get(section, key)
+                if key in ("tailscale",):
+                    val = cfg.getboolean(section, key)
+                setattr(args, key, val)
+            except (configparser.NoSectionError, configparser.NoOptionError):
+                pass
+
+
 def main():
+    default_config = os.path.expanduser("~/.config/mitmix/config.ini")
     parser = argparse.ArgumentParser(description="mitmix agent")
     parser.add_argument(
-        "--hub", required=True, help="Hub WebSocket URL (ws://host:8090)"
+        "--config",
+        default=default_config,
+        help="Config file path (default: ~/.config/mitmix/config.ini)",
     )
-    parser.add_argument("--token", required=True, help="Node registration token")
+    parser.add_argument("--hub", help="Hub WebSocket URL (ws://host:8090)")
+    parser.add_argument("--token", help="Node registration token")
     parser.add_argument(
         "--listen", default="0.0.0.0:8082", help="mitmproxy listen addr"
     )
@@ -196,7 +302,20 @@ def main():
     parser.add_argument(
         "--tailscale", action="store_true", help="Join tailnet as exit node"
     )
+    parser.add_argument(
+        "--install-cert",
+        action="store_true",
+        help="Download and install hub CA cert to system trust store",
+    )
     args = parser.parse_args()
+    merge_config(args)
+
+    if args.install_cert:
+        _install_cert(args.hub or os.environ.get("MITMIX_HUB", ""))
+        return
+
+    if not args.hub or not args.token:
+        parser.error("--hub and --token are required (via CLI or config file)")
 
     allow_hosts = (
         [h.strip() for h in args.allow_hosts.split(",") if h.strip()]

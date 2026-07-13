@@ -6,6 +6,8 @@
   let tokens = $state<Token[]>([])
   let error = $state('')
   let label = $state('')
+  let lastToken = $state<Token | null>(null)
+  let hubHost = $derived(typeof window !== 'undefined' ? window.location.host : 'hub:8090')
 
   async function load() {
     try { tokens = await listTokens() }
@@ -15,7 +17,7 @@
   async function submit() {
     if (!label.trim()) return
     try {
-      await generateToken(label.trim())
+      lastToken = await generateToken(label.trim())
       label = ''
       await load()
     } catch (e: any) { alert('Failed: ' + e.message) }
@@ -31,6 +33,10 @@
 
   function copy(tok: string) {
     navigator.clipboard.writeText(tok)
+  }
+
+  function closeGuide() {
+    lastToken = null
   }
 
   onMount(load)
@@ -62,6 +68,29 @@
   <button type="submit">Generate</button>
 </form>
 
+{#if lastToken}
+  <div class="guide">
+    <h3>Agent Setup</h3>
+    <button class="close" onclick={closeGuide}>&times;</button>
+    <ol>
+      <li>
+        <strong>Install agent</strong>
+        <pre><code>brew tap weeebdev/mitmix
+brew install mitmix-agent</code></pre>
+      </li>
+      <li>
+        <strong>Download &amp; install CA cert</strong>
+        <pre><code>mitmix-agent --install-cert</code></pre>
+      </li>
+      <li>
+        <strong>Configure &amp; start</strong>
+        <pre><code>mitmix-agent --hub ws://{hubHost} --token {lastToken.token}</code></pre>
+      </li>
+    </ol>
+    <p class="hint">Configure your browser/device to use <code>http://agent-ip:8082</code> as HTTP proxy.</p>
+  </div>
+{/if}
+
 <style>
   table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
   th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #21262d; font-size: 13px; }
@@ -80,4 +109,13 @@
   input { width: 100%; padding: 6px 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px; }
   button[type="submit"] { padding: 6px 16px; background: #238636; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; margin-top: 8px; }
   button[type="submit"]:hover { background: #2ea043; }
+  .guide { background: #161b22; padding: 16px; border-radius: 6px; border: 1px solid #30363d; margin-top: 16px; position: relative; }
+  .guide h3 { font-size: 14px; margin-bottom: 8px; }
+  .guide ol { margin: 0; padding-left: 20px; font-size: 13px; }
+  .guide li { margin: 12px 0; }
+  .guide pre { background: #0d1117; padding: 8px 12px; border-radius: 4px; margin: 4px 0; overflow-x: auto; }
+  .guide code { font-size: 12px; color: #8b949e; }
+  .guide .hint { color: #8b949e; font-size: 12px; margin-top: 8px; }
+  .guide .close { position: absolute; top: 8px; right: 12px; background: none; border: none; color: #8b949e; font-size: 20px; cursor: pointer; padding: 0; line-height: 1; }
+  .guide .close:hover { color: #c9d1d9; }
 </style>
