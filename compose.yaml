@@ -23,6 +23,9 @@ services:
     restart: unless-stopped
     ports:
       - "8082:8082"
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
     environment:
       - TS_AUTH_KEY=${TS_AUTH_KEY:-}
       - TS_HOSTNAME=${TS_HOSTNAME:-mitmix-agent}
