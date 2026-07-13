@@ -350,8 +350,10 @@ def _install_cert_firefox(hub_url=None):
     profiles = glob.glob(
         os.path.expanduser("~/.mozilla/firefox/*.default*")
     ) + glob.glob(os.path.expanduser("~/.mozilla/firefox/*.default-esr"))
+    zen = glob.glob(os.path.expanduser("~/Library/Application Support/zen/Profiles/*"))
+    profiles.extend(zen)
     if not profiles:
-        print("No Firefox profile found at ~/.mozilla/firefox/")
+        print("No Firefox/Zen profile found")
         sys.exit(1)
     prof = profiles[0]
     prof_path = os.path.join(prof, "cert9.db")
