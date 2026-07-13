@@ -3,7 +3,7 @@ TOKEN ?= test-agent-token
 VENV = agent/.venv
 PIDFILE = /tmp/mitmix-agent.pid
 
-.PHONY: proxy-on proxy-off proxy-status agent-stop agent-logs build-hub build-dashboard
+.PHONY: proxy-on proxy-off proxy-status agent-stop agent-logs build-hub build-dashboard cert-install
 
 proxy-on: check-agent
 	@if [ -f $(PIDFILE) ] && kill -0 $$(cat $(PIDFILE)) 2>/dev/null; then \
@@ -74,6 +74,19 @@ build-hub:
 
 build-dashboard:
 	cd internal/hub/site && npm run build
+
+cert-install:
+	@echo "Installing mitmix CA cert..."
+	@if [ -f ~/.mitmproxy/mitmproxy-ca-cert.pem ]; then \
+		echo "Using local cert at ~/.mitmproxy/mitmproxy-ca-cert.pem"; \
+		sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/.mitmproxy/mitmproxy-ca-cert.pem; \
+		echo "Done."; \
+	else \
+		curl -sf http://localhost:8090/api/mitm/ca-cert -o /tmp/mitmix-ca.pem && \
+		sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/mitmix-ca.pem && \
+		echo "Done." || \
+		echo "No cert found. Start hub and agent first, or run 'mitmix-agent cert install'"; \
+	fi
 
 check-agent:
 	@if [ ! -f $(VENV)/bin/python ]; then \
