@@ -92,7 +92,6 @@
     <h3>Flow Detail</h3>
     <div class="header-actions">
       <button class="btn-action" onclick={() => quickAction('intercept')}>⏸ Intercept</button>
-      <button class="btn-action" onclick={() => quickAction('decrypt')}>🔓 Decrypt</button>
       <button class="btn-action" onclick={copyCurl}>{copied ? 'Copied!' : 'cURL'}</button>
       <button class="btn-action rule" onclick={() => showRuleForm = !showRuleForm}>
         {showRuleForm ? 'Cancel' : 'Rule'}
@@ -163,10 +162,6 @@
       {/if}
     </div>
 
-    <div class="hint">
-      🔒 Record mode: headers only. 🔓 Decrypt: full body capture.
-      ⏸ Intercept: pause request for editing. Click buttons above to toggle per domain.
-    </div>
     {#if showRuleForm}
       <div class="rule-form">
         <h4>New Rule from Flow</h4>
@@ -224,7 +219,6 @@
   .btn-cancel { background: #21262d !important; color: #c9d1d9 !important; border: 1px solid #30363d !important; }
   .btn-cancel:hover { background: #30363d !important; }
   .toast { position: sticky; bottom: 0; padding: 8px 16px; background: #238636; color: #fff; font-size: 12px; text-align: center; }
-  .hint { padding: 8px 16px; font-size: 11px; color: #8b949e; border-top: 1px solid #30363d; }
   .link { background: none; border: none; color: #58a6ff; cursor: pointer; padding: 0; font: inherit; font-size: 13px; text-decoration: underline; }
   .link:hover { color: #79c0ff; }
 </style>

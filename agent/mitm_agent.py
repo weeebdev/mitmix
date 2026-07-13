@@ -65,17 +65,14 @@ class AgentAddon:
                 if flow.response and flow.response.headers
                 else {}
             )
-            decrypt = self.rule_engine.has_action(flow, "decrypt")
-            req_body = (
-                (flow.request.content or b"")[:102400].decode("utf-8", errors="replace")
-                if decrypt
-                else ""
+            req_body = (flow.request.content or b"")[:102400].decode(
+                "utf-8", errors="replace"
             )
             resp_body = (
                 (flow.response.content or b"")[:102400].decode(
                     "utf-8", errors="replace"
                 )
-                if flow.response and decrypt
+                if flow.response
                 else ""
             )
             src_ip = flow.client_conn.peername[0] if flow.client_conn.peername else ""

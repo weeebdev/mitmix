@@ -17,7 +17,6 @@
   let error = $state('')
   let newFlowIds = $state<Set<string>>(new Set())
   let topApps = $state<string[]>([])
-  let decryptRules = $state<Map<string, string>>(new Map())
   let interceptRules = $state<Map<string, string>>(new Map())
   let rulesLoaded = $state(false)
   let interval: number
@@ -41,7 +40,7 @@
   let filterApp = $state('')
   let filterSource = $state('')
   let filterSince = $state('')
-  let timePreset = $state('5m')
+  let timePreset = $state('all')
 
   function timeSince(preset: string): string {
     const ms = { '5m': 300000, '30m': 1800000, '1h': 3600000, '6h': 21600000 }[preset] || 0
@@ -67,17 +66,14 @@
   async function loadRules() {
     try {
       const all = await listRules()
-      const dr = new Map<string, string>()
       const ir = new Map<string, string>()
       for (const r of all) {
         if (!r.enabled) continue
         let host = ''
         try { host = JSON.parse(r.match).host || '' } catch {}
         if (!host) continue
-        if (r.action === 'decrypt') dr.set(host, r.id)
         if (r.action === 'intercept') ir.set(host, r.id)
       }
-      decryptRules = dr
       interceptRules = ir
       rulesLoaded = true
     } catch {}
@@ -170,11 +166,9 @@
     if (flowFilters.status) { status = flowFilters.status; filterStatus = flowFilters.status }
     if (flowFilters.app) { app = flowFilters.app; filterApp = flowFilters.app }
     if (flowFilters.source) { source = flowFilters.source; filterSource = flowFilters.source }
-    filterSince = timeSince('5m')
     load()
-    getStats().then(s => { topApps = (s.top_apps || []).map(a => a.app) }).catch(() => {})
     loadRules()
-    interval = setInterval(load, 5000)
+    interval = setInterval(() => { load(); getStats().then(s => { topApps = (s.top_apps || []).map(a => a.app) }).catch(() => {}) }, 5000)
     cleanup = connectLive((msg) => {
       if (msg.action === 'flow_created') {
         const f = msg.data
@@ -253,9 +247,6 @@
               <td>{f.duration_ms}ms</td>
               <td class="actions">
                 {#if rulesLoaded}
-                  <button class="action-btn decrypt" title="Decrypt (capture bodies)" onclick={(e) => { e.stopPropagation(); toggleAction(f.host.replace(/:.*/, ''), 'decrypt', decryptRules.get('*.' + f.host.replace(/:.*/, '').split('.').slice(-2).join('.'))) }}>
-                    {decryptRules.has('*.' + f.host.replace(/:.*/, '').split('.').slice(-2).join('.')) ? '🔓' : '🔒'}
-                  </button>
                   <button class="action-btn intercept" title="Intercept (pause)" onclick={(e) => { e.stopPropagation(); toggleAction(f.host.replace(/:.*/, ''), 'intercept', interceptRules.get('*.' + f.host.replace(/:.*/, '').split('.').slice(-2).join('.'))) }}>
                     {interceptRules.has('*.' + f.host.replace(/:.*/, '').split('.').slice(-2).join('.')) ? '⏸' : '⏭'}
                   </button>
@@ -324,7 +315,6 @@
   .actions { white-space: nowrap; display: flex; gap: 2px; }
   .action-btn { background: none; border: 1px solid #30363d; border-radius: 3px; cursor: pointer; font-size: 12px; padding: 1px 4px; line-height: 1.4; }
   .action-btn:hover { background: #21262d; }
-  .action-btn.decrypt:hover { border-color: #58a6ff; }
   .action-btn.intercept:hover { border-color: #d29922; }
   .loading { color: #8b949e; font-size: 12px; }
 </style>
