@@ -168,7 +168,7 @@ func (h *Hub) handleListFlows(e *core.RequestEvent) error {
 		filter = strings.Join(filters, " && ")
 	}
 
-	records, err := h.FindRecordsByFilter("flows", filter, "", 100, 0, params)
+	records, err := h.FindRecordsByFilter("flows", filter, "-captured_at", 500, 0, params)
 	if err != nil {
 		log.Printf("flows query error: %v", err)
 		return e.InternalServerError("query failed", err)

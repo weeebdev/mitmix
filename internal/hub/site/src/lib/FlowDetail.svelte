@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { getFlowDetail, createRule, fmtDate } from '../api'
-  import type { FlowDetail, Flow } from '../api'
+  import { getFlowDetail, createRule, deleteRule, listRules, fmtDate } from '../api'
+  import type { FlowDetail, Flow, Rule } from '../api'
 
   let {
     flow, onclose, onNavigate = (_: any) => {}
@@ -16,6 +16,35 @@
   let showRuleForm = $state(false)
   let ruleCreated = $state(false)
   let creating = $state(false)
+  let quickActionMsg = $state('')
+  let quickActionTimeout: number
+
+  async function quickAction(action: string) {
+    if (!detail) return
+    const host = detail.host.replace(/:.*/, '')
+    const domain = '*.' + host.split('.').slice(-2).join('.')
+    try {
+      const all = await listRules()
+      const existing = all.find(r => {
+        if (!r.enabled || r.action !== action) return false
+        try { return JSON.parse(r.match).host === domain } catch { return false }
+      })
+      if (existing) {
+        await deleteRule(existing.id)
+        quickActionMsg = action === 'intercept' ? 'Intercept OFF for ' + domain : 'Decrypt OFF for ' + domain
+      } else {
+        await createRule({
+          action, match: JSON.stringify({ host: domain }),
+          priority: 100, enabled: true,
+        } as any)
+        quickActionMsg = action === 'intercept' ? 'Intercept ON for ' + domain : 'Decrypt ON for ' + domain
+      }
+      clearTimeout(quickActionTimeout)
+      quickActionTimeout = setTimeout(() => quickActionMsg = '', 3000)
+    } catch (e: any) {
+      alert('Failed: ' + e.message)
+    }
+  }
 
   $effect(() => {
     loading = true
@@ -62,9 +91,11 @@
   <div class="panel-header">
     <h3>Flow Detail</h3>
     <div class="header-actions">
-      <button class="btn-action" onclick={copyCurl}>{copied ? 'Copied!' : 'Copy as cURL'}</button>
-      <button class="btn-action" onclick={() => showRuleForm = !showRuleForm}>
-        {showRuleForm ? 'Cancel' : 'Write Rule'}
+      <button class="btn-action" onclick={() => quickAction('intercept')}>⏸ Intercept</button>
+      <button class="btn-action" onclick={() => quickAction('decrypt')}>🔓 Decrypt</button>
+      <button class="btn-action" onclick={copyCurl}>{copied ? 'Copied!' : 'cURL'}</button>
+      <button class="btn-action rule" onclick={() => showRuleForm = !showRuleForm}>
+        {showRuleForm ? 'Cancel' : 'Rule'}
       </button>
       <button class="close" onclick={onclose}>&times;</button>
     </div>
@@ -145,6 +176,9 @@
       </div>
     {/if}
 
+    {#if quickActionMsg}
+      <div class="toast">{quickActionMsg}</div>
+    {/if}
     {#if ruleCreated}
       <div class="toast">Rule created!</div>
     {/if}
