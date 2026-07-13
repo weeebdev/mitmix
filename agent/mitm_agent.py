@@ -9,6 +9,7 @@ import subprocess
 import sys
 import threading
 import time
+from urllib.parse import urlparse
 
 from mitmproxy import options
 from mitmproxy.tools import dump
@@ -42,6 +43,8 @@ class AgentAddon:
         self._ws_thread = None
         self.allow_hosts = allow_hosts or []
         self.ignore_hosts = ignore_hosts or []
+        hub_parsed = urlparse(hub_url)
+        self.hub_host = hub_parsed.hostname or "hub"
 
     def request(self, flow):
         try:
@@ -122,9 +125,11 @@ class AgentAddon:
             logger.warning("capture error: %s", e)
 
     def _should_skip(self, flow):
+        host = flow.request.host
+        if host == self.hub_host or host.startswith("127.") or host == "localhost" or host == "::1":
+            return True
         if not self.allow_hosts and not self.ignore_hosts:
             return False
-        host = flow.request.host
         if self.ignore_hosts:
             for pat in self.ignore_hosts:
                 if _host_match(pat, host):
