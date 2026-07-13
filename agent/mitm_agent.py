@@ -145,33 +145,48 @@ class AgentAddon:
         pass
 
 
-def _install_cert(hub_url):
-    if not hub_url:
-        print("ERROR: --hub or MITMIX_HUB required for --install-cert")
-        sys.exit(1)
-    rest_url = hub_url.replace("ws://", "http://").replace("wss://", "https://")
-    cert_url = rest_url.rstrip("/") + "/api/mitm/ca-cert"
-    import urllib.request, urllib.error
-
+def _install_cert(hub_url=None, pem_data=None):
     pem_path = os.path.expanduser("~/.mitmproxy/mitmproxy-ca-cert.pem")
-    try:
-        resp = urllib.request.urlopen(cert_url, timeout=10)
-        pem = resp.read()
-    except urllib.error.HTTPError as e:
-        print("ERROR: hub returned %d — no CA cert registered yet" % e.code)
-        sys.exit(1)
-    except Exception as e:
-        print("ERROR: cannot fetch CA cert from %s: %s" % (cert_url, e))
-        sys.exit(1)
+    if pem_data is None:
+        local = os.path.expanduser("~/.mitmproxy/mitmproxy-ca-cert.pem")
+        if hub_url:
+            import urllib.request, urllib.error
+
+            rest_url = hub_url.replace("ws://", "http://").replace("wss://", "https://")
+            cert_url = rest_url.rstrip("/") + "/api/mitm/ca-cert"
+            try:
+                resp = urllib.request.urlopen(cert_url, timeout=10)
+                pem_data = resp.read()
+                print("Downloaded CA cert from %s" % cert_url)
+            except urllib.error.HTTPError as e:
+                print("ERROR: hub returned %d — no CA cert registered yet" % e.code)
+                sys.exit(1)
+            except Exception as e:
+                print("ERROR: cannot fetch CA cert: %s" % e)
+                sys.exit(1)
+        elif os.path.exists(local):
+            with open(local, "rb") as f:
+                pem_data = f.read()
+            print("Using local CA cert at %s" % local)
+        else:
+            print(
+                "No CA cert found. Start mitmproxy first to generate it, or provide --hub."
+            )
+            sys.exit(1)
+
     os.makedirs(os.path.dirname(pem_path), exist_ok=True)
     with open(pem_path, "wb") as f:
-        f.write(pem)
+        f.write(pem_data)
     print("CA cert saved to %s" % pem_path)
+    _trust_cert(pem_data)
+
+
+def _trust_cert(pem_data):
     if sys.platform == "darwin":
-        import tempfile, shutil
+        import tempfile
 
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pem")
-        tmp.write(pem)
+        tmp.write(pem_data)
         tmp.close()
         subprocess.run(
             [
@@ -193,17 +208,19 @@ def _install_cert(hub_url):
         cert_path = os.path.join(cert_dir, "mitmproxy-ca-cert.crt")
         try:
             with open(cert_path, "wb") as f:
-                f.write(pem)
+                f.write(pem_data)
             subprocess.run(["update-ca-certificates"], check=False)
             print("Installed to %s" % cert_path)
         except PermissionError:
             print(
                 "CA cert saved. Install manually:\n"
-                "  sudo cp %s /usr/local/share/ca-certificates/mitmproxy-ca-cert.crt\n"
-                "  sudo update-ca-certificates" % pem_path
+                "  sudo cp ~/.mitmproxy/mitmproxy-ca-cert.pem /usr/local/share/ca-certificates/\n"
+                "  sudo update-ca-certificates"
             )
     else:
-        print("CA cert saved to %s. Install manually for your OS." % pem_path)
+        print(
+            "CA cert at ~/.mitmproxy/mitmproxy-ca-cert.pem. Install manually for your OS."
+        )
 
 
 def _start_tailscale():
@@ -319,6 +336,21 @@ def _get_network_service():
     return "Wi-Fi"
 
 
+def _cert_command(args):
+    if not args or args[0] == "install":
+        parser = argparse.ArgumentParser(description="install mitmix CA cert")
+        parser.add_argument("--hub", help="Hub URL to download cert from")
+        parsed, _ = parser.parse_known_args(args[1:] if args else [])
+        _install_cert(hub_url=parsed.hub)
+    elif args[0] == "path":
+        p = os.path.expanduser("~/.mitmproxy/mitmproxy-ca-cert.pem")
+        print(p)
+    else:
+        print("Usage: mitmix-agent cert install [--hub ws://...]")
+        print("       mitmix-agent cert path")
+        sys.exit(1)
+
+
 ENV_MAP = {
     "hub": "MITMIX_HUB",
     "token": "MITMIX_TOKEN",
@@ -361,6 +393,8 @@ def merge_config(args):
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "proxy":
         return _proxy_command(sys.argv[2] if len(sys.argv) > 2 else "status")
+    if len(sys.argv) > 1 and sys.argv[1] == "cert":
+        return _cert_command(sys.argv[2:] if len(sys.argv) > 2 else [])
 
     default_config = os.path.expanduser("~/.config/mitmix/config.ini")
     parser = argparse.ArgumentParser(description="mitmix agent")
