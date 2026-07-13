@@ -87,6 +87,38 @@ export async function login(identity: string, password: string): Promise<void> {
   throw new Error(lastErr)
 }
 
+export interface AuthProvider {
+  name: string
+  displayName: string
+  state: string
+  authUrl: string
+  codeVerifier: string
+  pkce: boolean
+}
+
+export async function fetchAuthMethods(): Promise<{
+  password: { enabled: boolean }
+  oauth2: { enabled: boolean; providers: AuthProvider[] }
+}> {
+  const r = await fetch('/api/collections/users/auth-methods')
+  return r.json()
+}
+
+export function handleOAuthRedirect(): boolean {
+  const hash = window.location.hash
+  if (!hash || hash === '#') return false
+  try {
+    const raw = decodeURIComponent(hash.slice(1))
+    const data = JSON.parse(raw)
+    if (data.token) {
+      setToken(data.token)
+      window.history.replaceState(null, '', window.location.pathname)
+      return true
+    }
+  } catch {}
+  return false
+}
+
 export function logout() { clearToken() }
 
 export function isAuthed(): boolean { return !!getToken() }
