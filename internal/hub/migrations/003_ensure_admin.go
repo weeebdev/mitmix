@@ -1,6 +1,9 @@
 package migrations
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"log"
 	"os"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -20,7 +23,10 @@ func init() {
 			email = "admin@mitm.local"
 		}
 		if pass == "" {
-			pass = "mitmadmin123"
+			b := make([]byte, 24)
+			rand.Read(b)
+			pass = hex.EncodeToString(b)
+			log.Printf("generated random admin password (set HUB_ADMIN_PASSWORD to override): %s", pass)
 		}
 		col, err := app.FindCollectionByNameOrId(core.CollectionNameSuperusers)
 		if err != nil {
